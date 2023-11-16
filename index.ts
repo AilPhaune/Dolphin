@@ -38,7 +38,7 @@ st_builder.addAST(ast);
 const symbols = st_builder.build();
 
 const sf_builder = new StackFrameBuilder(symbols);
-sf_builder.generate(ast);
+sf_builder.generate(ast, sf_builder.build(symbols.root));
 
 fs.writeFileSync("ast.json", JSON.stringify(ast, replacer, 4));
 fs.writeFileSync("symbols.json", JSON.stringify(symbols, replacer, 4));

@@ -55,26 +55,49 @@ export class Assembly {
         this.stack.pop();
     }
 
+    findVar(name: string, frame: StackFrame) {
+        let f;
+        let frameOffset = 0;
+        let i = 0;
+        do {
+            f = frame.find(name);
+            i++;
+            frameOffset += this.stack[this.stack.length - i];
+            if(f) break;
+            if(!frame.parentStackFrame) break;
+            frameOffset += frame.sizeBytes;
+            frame = frame.parentStackFrame;
+        } while(true);
+        
+        if(!f) return null;
+
+        return {
+            sizeBytes: f.sizeBytes,
+            ref: f.ref,
+            index: f.index + frameOffset
+        };
+    }
+
     saveVariable(name: string, frame: StackFrame, offset: number, source: string) {
-        const index = frame.find(name);
+        const index = this.findVar(name, frame);
         if(!index) {
             throw new Error(`Variable ${name} not found`);
         }
         if(index.sizeBytes <= offset) {
             throw new Error(`Variable space overflow`);
         }
-        this.MOV(source, this.stackIndex(index.index + offset + this.stackOffset));
+        this.MOV(source, this.stackIndex(index.index + offset));
     }
 
     readVariable(name: string, frame: StackFrame, offset: number, dest: string) {
-        const index = frame.find(name);
+        const index = this.findVar(name, frame);
         if(!index) {
             throw new Error(`Variable ${name} not found`);
         }
         if(index.sizeBytes <= offset) {
             throw new Error(`Variable space overflow`);
         }
-        this.MOV(this.stackIndex(index.index + offset + this.stackOffset), dest);
+        this.MOV(this.stackIndex(index.index + offset), dest);
     }
 
     stackIndex(index: number): string {

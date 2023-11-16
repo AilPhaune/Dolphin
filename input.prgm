@@ -1,5 +1,9 @@
-if (0) {
-    let x: u8 = 5 - 1;
-} else {
-    let x: u8 = 2 + 17;
+let x: u8 = 30;
+
+{
+    let y: u8 = 81;
+    let z: u8 = 42;
+    {
+        let abcde: u8 = x + y - z;
+    }
 }
