@@ -52,6 +52,9 @@ export class SymbolTableBuilder {
         } else if(node.type == 'var_assign') {
             this.findDeclarations(node.name, parent);
             this.findDeclarations(node.value, parent);
+        } else if(node.type == 'while_loop') {
+            this.findDeclarations(node.condition, parent);
+            this.findDeclarations(node.loop_body, parent);
         } else if(node.type == 'void_expr' || node.type == 'integer' || node.type == 'symbol' || node.type == 'native_type') {
             return;
         } else {
@@ -126,6 +129,11 @@ export class SymbolTableBuilder {
                 throw new Error(`Type of variable ${node.resolvedVariable.path} could not be resolved`);
             }
             node.runtimeType = node.resolvedVariable.resolved_var_type;
+        } else if(node.type == 'while_loop') {
+            this.resolveTypes(node.condition, parent);
+            this.resolveTypes(node.loop_body, parent);
+            node.loop_body.runtimeType = RUNTIME_VOID;
+            node.runtimeType = RUNTIME_VOID;
         } else if(node.type == 'void_expr' || node.type == 'native_type') {
             return;
         } else {

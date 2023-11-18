@@ -1,6 +1,6 @@
 export type Token = TokenEof | TokenOp | TokenInteger | TokenSymbol | TokenKeyword;
 
-export type keyword = "let" | "u8" | "u16" | "void" | "if" | "else";
+export type keyword = "let" | "u8" | "u16" | "void" | "if" | "else" | "while" | "continue" | "break";
 export type operator = ";" | "{" | "}" | "(" | ")" | "+" | "-" | "=" | ":";
 
 export interface Position {
@@ -32,7 +32,7 @@ export const OPERATORS: operator[] = [
 ];
 
 export const KEYWORDS: keyword[] = [
-    "let", "u8", "u16", "if", "else", "void"
+    "let", "u8", "u16", "if", "else", "void", "while", "continue", "break"
 ];
 
 export interface TokenOp {

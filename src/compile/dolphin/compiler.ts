@@ -260,11 +260,17 @@ export class Compiler {
             if(lastRet) {
                 size = getTypeSizeBytes(lastRet);
                 if(size != 0) {
-                    for(let i = size - 1; i >= 0; i--) {
-                        this.assembly.MOV(this.assembly.stackIndex(i), 'A');
-                        this.assembly.MOV('A', this.assembly.stackIndex(node.generatedScope.stackframe.sizeBytes + i));
+                    if(node.runtimeType?.type == 'runtime_void') {
+                        this.assembly.fixStackUnpush(size);
+                    } else if(node.runtimeType && size == getTypeSizeBytes(node.runtimeType)) {
+                        for(let i = size - 1; i >= 0; i--) {
+                            this.assembly.MOV(this.assembly.stackIndex(i), 'A');
+                            this.assembly.MOV('A', this.assembly.stackIndex(node.generatedScope.stackframe.sizeBytes + i));
+                        }
+                        this.assembly.fixStackUnpushNoUpdateSP(size);
+                    } else {
+                        throw new Error(`Invalid return type for statement`);
                     }
-                    this.assembly.fixStackUnpushNoUpdateSP(size);
                 }
             }
             this.assembly.cleanStackframe(node.generatedScope.stackframe);
@@ -273,10 +279,10 @@ export class Compiler {
             if(!node.generatedScope) {
                 throw new Error(`Can't compile variable declaration because no scope was assigned to the node ${node}`);
             }
-            if(node.runtimeType != node.generatedScope.resolved_var_type) {
-                throw new Error(`Can't assign ${JSON.stringify(node.runtimeType)} to ${JSON.stringify(node.generatedScope.resolved_var_type)}`);
-            }
             if(node.value) {
+                if(node.value.runtimeType != node.generatedScope.resolved_var_type) {
+                    throw new Error(`Can't assign ${JSON.stringify(node.runtimeType)} to ${JSON.stringify(node.generatedScope.resolved_var_type)}`);
+                }
                 this.compile(node.value, stackframe);
             }
             this.assembly.POP("A");
@@ -336,7 +342,7 @@ export class Compiler {
             this.assembly.CMP(this.assembly.integer(0), "A");
             const else_branch_label = this.assembly.nextLabel("ELSE");
             const end_if_label = this.assembly.nextLabel("END_IF");
-            this.assembly.JMP_EQ(node.else_branch ? else_branch_label : end_if_label);
+            this.assembly.JMP_EQ(node.else_branch ? else_branch_label : end_if_label); // the condition is false
             this.compile(node.if_branch, stackframe);
             if(node.else_branch) {
                 this.assembly.JMP(end_if_label);
@@ -344,6 +350,20 @@ export class Compiler {
                 this.compile(node.else_branch, stackframe);
             }
             this.assembly.LABEL(end_if_label);
+        } else if(node.type == 'while_loop') {
+            if(node.condition.runtimeType != RUNTIME_UINT8) {
+                throw new Error(`UNIMPLEMENTED: Only uint8 is supported for while loop conditions, got ${node.runtimeType}`);
+            }
+            const condition_label = this.assembly.nextLabel("WHILE_LOOP");
+            const end_while_label = this.assembly.nextLabel("END_WHILE");
+            this.assembly.LABEL(condition_label);
+            this.compile(node.condition, stackframe);
+            this.assembly.POP("A");
+            this.assembly.CMP(this.assembly.integer(0), "A");
+            this.assembly.JMP_EQ(end_while_label); // the condition is false
+            this.compile(node.loop_body, stackframe);
+            this.assembly.JMP(condition_label);
+            this.assembly.LABEL(end_while_label);
         } else if(node.type == 'void_expr' || node.type == 'native_type') {
             return;
         } else {

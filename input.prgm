@@ -1,3 +1,4 @@
-let x: u8 = {
-    void;
-};
+let x: u8 = 10;
+while (x) {
+    x = x - 1;
+}

@@ -65,6 +65,9 @@ export class StackFrameBuilder {
         } else if(node.type == 'var_assign') {
             this.generate(node.name, parentStackFrame);
             this.generate(node.value, parentStackFrame);
+        } else if(node.type == 'while_loop') {
+            this.generate(node.condition, parentStackFrame);
+            this.generate(node.loop_body, parentStackFrame);
         } else if(node.type == 'void_expr' || node.type == 'native_type' || node.type == 'integer' || node.type == 'symbol') {
             return;
         } else {

@@ -6,7 +6,7 @@ import { VariableAssignmentNode, VariableDeclarationNode } from "../ast/var";
 import { AdditionNode, ExpressionNode, IntegerNode, SubtractionNode, SymbolNode, VoidNode } from "../ast/expression";
 import { NativeTypeNode, TypeNode } from "../ast/type";
 import { ASTNode } from "../ast/ast";
-import { IfElseNode } from "../ast/controlflow";
+import { IfElseNode, WhileLoopNode } from "../ast/controlflow";
 
 export class Parser {
 
@@ -68,6 +68,9 @@ export class Parser {
         if(this.isKeyword("let")) {
             return this.parseVariableDeclaration();
         }
+        if(this.isKeyword("while")) {
+            return this.parseWhileLoop();
+        }
         return this.parseExpression();
     }
 
@@ -76,6 +79,21 @@ export class Parser {
             return this.parseIfStatement();
         }
         return this.parseAddition();
+    }
+
+    private parseWhileLoop(): WhileLoopNode {
+        const kw_while = this.stream.next() as TokenKeyword;
+        if(!this.isOperator('(')) {
+            throw new Error(`Expected '(', got ${this.stream.peek()?.type}`);
+        }
+        this.stream.next();
+        const condition = this.parseExpression();
+        if(!this.isOperator(')')) {
+            throw new Error(`Expected ')', got ${this.stream.peek()?.type}`);
+        }
+        this.stream.next();
+        const loop_body = this.parseStatement();
+        return new WhileLoopNode(condition, loop_body, extendPosition(kw_while.position, loop_body.position));
     }
 
     private parseIfStatement(): IfElseNode {
