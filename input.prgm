@@ -1,4 +1,11 @@
 let x: u8 = 10;
 while (x) {
-    x = x - 1;
+    if (x - 5) {
+        x = x - 1;
+        void;
+    } else {
+        break;
+    };
 }
+
+while (1) {}

@@ -15,7 +15,9 @@ export interface SymbolVariable {
     table: SymbolTable;
 }
 
-export interface SymbolScope {
+export type SymbolScope = SymbolRegularScope | SymbolLoopScope;
+
+export interface SymbolScopeBase {
     type: "scope";
     path: string;
     children: {
@@ -26,12 +28,24 @@ export interface SymbolScope {
     stackframe?: StackFrame;
 }
 
+export interface SymbolRegularScope extends SymbolScopeBase {
+    specialType: "regular";
+}
+
+export interface SymbolLoopScope extends SymbolScopeBase {
+    specialType: "loop";
+    kind: "for_loop";
+    jumpContinueLabel?: string;
+    jumpBreakLabel?: string;
+}
+
 export class SymbolTable {
     public readonly root: SymbolScope;
 
     constructor() {
         this.root = {
             type: "scope",
+            specialType: "regular",
             children: {},
             anonymousCount: 0n,
             path: "",
@@ -50,6 +64,14 @@ export class SymbolTable {
             parent = child;
         }
         return parent;
+    }
+
+    static findParent(scope: SymbolScope): SymbolScope | null {
+        const idx = scope.path.lastIndexOf('.');
+        if(idx < 0) return null;
+        const symbol = scope.table.find(scope.path.substring(0, idx));
+        if(symbol?.type != 'scope') throw new Error(`Symbol '${scope.path}' has a parent that is not a SymbolScope`);
+        return symbol;
     }
 
     static resolveType(type: RuntimeType): RuntimeType | null {
@@ -100,6 +122,7 @@ export class SymbolTable {
         parent.anonymousCount++;
         const scope: SymbolScope = {
             type: "scope",
+            specialType: "regular",
             path: `${parent.path == "" ? "" : (parent.path + ".")}${name}`,
             children: {},
             anonymousCount: 0n,

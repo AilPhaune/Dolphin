@@ -366,6 +366,10 @@ export class Compiler {
             }
             const condition_label = this.assembly.nextLabel("WHILE_LOOP");
             const end_while_label = this.assembly.nextLabel("END_WHILE");
+            if(node.loop_body.type == 'statements' && node.loop_body.generatedScope?.specialType == 'loop') {
+                node.loop_body.generatedScope.jumpBreakLabel = end_while_label;
+                node.loop_body.generatedScope.jumpContinueLabel = condition_label;
+            }
             this.assembly.LABEL(condition_label);
             this.compile(node.condition, stackframe);
             this.assembly.POP("A");
@@ -374,6 +378,22 @@ export class Compiler {
             this.compile(node.loop_body, stackframe);
             this.assembly.JMP(condition_label);
             this.assembly.LABEL(end_while_label);
+        } else if(node.type == 'break_loop' || node.type == 'continue_loop') {
+            if(!node.loopScope) {
+                throw new Error(`Can't compile '${node.type.replaceAll('_loop', '')}' node because it was not associated to any loop`);
+            }
+            let label: string | undefined;
+            if(node.type == 'break_loop') {
+                label = node.loopScope.jumpBreakLabel;
+            } else if(node.type == 'continue_loop') {
+                label = node.loopScope.jumpContinueLabel;
+            } else {
+                throw Error(`Invalid loop control`);
+            }
+            if(!label) {
+                throw new Error(`Can't compile '${node.type.replaceAll('_loop', '')}' node because it was associated with didn't provide a jump label for the operation`);
+            }
+            this.assembly.JMP(label);
         } else if(node.type == 'void_expr' || node.type == 'native_type') {
             return;
         } else {

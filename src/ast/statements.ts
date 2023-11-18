@@ -2,11 +2,11 @@ import { RuntimeType } from "../analysis/rt_type";
 import { SymbolScope } from "../analysis/symbol_table";
 import { Position } from "../lexer/token";
 import { AstNode } from "./ast";
-import { WhileLoopNode } from "./controlflow";
+import { BreakNode, ContinueNode, WhileLoopNode } from "./controlflow";
 import { ExpressionNode } from "./expression";
 import { VariableDeclarationNode } from "./var";
 
-export type StatementNode = StatementsNode | VariableDeclarationNode | ExpressionNode | WhileLoopNode;
+export type StatementNode = StatementsNode | VariableDeclarationNode | ExpressionNode | WhileLoopNode | BreakNode | ContinueNode;
 
 export class StatementsNode implements AstNode {
     public readonly type: "statements" = "statements";

@@ -6,7 +6,7 @@ import { VariableAssignmentNode, VariableDeclarationNode } from "../ast/var";
 import { AdditionNode, ExpressionNode, IntegerNode, SubtractionNode, SymbolNode, VoidNode } from "../ast/expression";
 import { NativeTypeNode, TypeNode } from "../ast/type";
 import { ASTNode } from "../ast/ast";
-import { IfElseNode, WhileLoopNode } from "../ast/controlflow";
+import { BreakNode, ContinueNode, IfElseNode, WhileLoopNode } from "../ast/controlflow";
 
 export class Parser {
 
@@ -70,6 +70,12 @@ export class Parser {
         }
         if(this.isKeyword("while")) {
             return this.parseWhileLoop();
+        }
+        if(this.isKeyword("break")) {
+            return new BreakNode(this.stream.next()?.position as Position);
+        }
+        if(this.isKeyword("continue")) {
+            return new ContinueNode(this.stream.next()?.position as Position);
         }
         return this.parseExpression();
     }

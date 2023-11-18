@@ -55,7 +55,13 @@ export class SymbolTableBuilder {
         } else if(node.type == 'while_loop') {
             this.findDeclarations(node.condition, parent);
             this.findDeclarations(node.loop_body, parent);
-        } else if(node.type == 'void_expr' || node.type == 'integer' || node.type == 'symbol' || node.type == 'native_type') {
+            if(node.loop_body.type == 'statements') {
+                if(!node.loop_body.generatedScope) {
+                    throw new Error(`Failed to generate scope for while loop body`);
+                }
+                node.loop_body.generatedScope.specialType = 'loop';
+            }
+        } else if(node.type == 'break_loop' || node.type == 'continue_loop' || node.type == 'void_expr' || node.type == 'integer' || node.type == 'symbol' || node.type == 'native_type') {
             return;
         } else {
             throw new Error(`SymbolTableBuilder.findDeclarations(): Unknown node type ${(node as any).type}`);
@@ -80,6 +86,7 @@ export class SymbolTableBuilder {
             if(!node.generatedScope) {
                 throw new Error(`Scope for statements ${node} not generated.`);
             }
+            node.runtimeType = RUNTIME_VOID;
             for(const stmt of node.statements) {
                 this.resolveTypes(stmt, node.generatedScope);
                 node.runtimeType = stmt.runtimeType;
@@ -133,6 +140,20 @@ export class SymbolTableBuilder {
             this.resolveTypes(node.condition, parent);
             this.resolveTypes(node.loop_body, parent);
             node.loop_body.runtimeType = RUNTIME_VOID;
+            node.runtimeType = RUNTIME_VOID;
+        } else if(node.type == 'break_loop' || node.type == 'continue_loop') {
+            // Find which loop
+            do {
+                if(parent.type == 'scope' && parent.specialType == 'loop') {
+                    node.loopScope = parent;
+                }
+                const p = SymbolTable.findParent(parent);
+                if(!p) break;
+                parent = p;
+            } while(true);
+            if(!node.loopScope) {
+                throw new Error(`Attempt to use loop control while not in a loop`);
+            }
             node.runtimeType = RUNTIME_VOID;
         } else if(node.type == 'void_expr' || node.type == 'native_type') {
             return;
