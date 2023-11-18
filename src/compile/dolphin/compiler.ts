@@ -105,7 +105,25 @@ export class Assembly {
     }
 
     fixStackUnpush(bytes: number) {
+        if(bytes == 0) return;
         this.ADD(this.integer(bytes), "SP");
+        this.stack[this.stack.length - 1] -= bytes;
+    }
+
+    fixStackUnpushNoUpdateSP(bytes: number) {
+        if(bytes == 0) return;
+        this.stack[this.stack.length - 1] -= bytes;
+    }
+
+    fixStackPush(bytes: number) {
+        if(bytes == 0) return;
+        this.SUB(this.integer(bytes), "SP");
+        this.stack[this.stack.length - 1] += bytes;
+    }
+
+    fixStackPushNoUpdateSP(bytes: number) {
+        if(bytes == 0) return;
+        this.stack[this.stack.length - 1] += bytes;
     }
 
     nextLabel(name: string): string {
@@ -118,10 +136,16 @@ export class Assembly {
     }
 
     ADD(value: string, dest: string) {
+        if(["#0", "H'0", "H'00", "H'00"].includes(value)) {
+            return;
+        }
         this.write(`ADD ${value}, ${dest}`);
     }
 
     SUB(value: string, dest: string) {
+        if(["#0", "H'0", "H'00", "H'00"].includes(value)) {
+            return;
+        }
         this.write(`SUB ${value}, ${dest}`);
     }
 
@@ -147,6 +171,18 @@ export class Assembly {
         }
         this.lastPoped = dest;
         this.pushPopWait = `POP ${dest}`;
+    }
+
+    /**
+     * Does the same as POP but doesn't pop the value
+     */
+    STACK_PEEK(dest: string, offset: number = 0) {
+        if(this.pushPopWait) {
+            const v = this.pushPopWait;
+            this.pushPopWait = null;
+            this.write(v);
+        }
+        this.MOV(this.stackIndex(offset), dest);
     }
 
     PUSH(src: string) {
@@ -220,14 +256,19 @@ export class Compiler {
                 this.compile(stmt, node.generatedScope.stackframe);
                 lastRet = stmt.runtimeType;
             }
+            let size = 0;
             if(lastRet) {
-                let size = getTypeSizeBytes(lastRet);
+                size = getTypeSizeBytes(lastRet);
                 if(size != 0) {
-                    // TODO:
-                    throw new Error(`Unsupported return value for statements`);
+                    for(let i = size - 1; i >= 0; i--) {
+                        this.assembly.MOV(this.assembly.stackIndex(i), 'A');
+                        this.assembly.MOV('A', this.assembly.stackIndex(node.generatedScope.stackframe.sizeBytes + i));
+                    }
+                    this.assembly.fixStackUnpushNoUpdateSP(size);
                 }
             }
             this.assembly.cleanStackframe(node.generatedScope.stackframe);
+            this.assembly.fixStackPushNoUpdateSP(size);
         } else if(node.type == 'var_decl') {
             if(!node.generatedScope) {
                 throw new Error(`Can't compile variable declaration because no scope was assigned to the node ${node}`);
@@ -237,6 +278,17 @@ export class Compiler {
             }
             this.assembly.POP("A");
             this.assembly.saveVariable(node.generatedScope.path, stackframe, 0, "A");
+        } else if(node.type == 'var_assign') {
+            if(!node.resolvedVariable) {
+                throw new Error(`Can't compile variable assignment because the variable ${node.name.name} couldn't be resolved`);
+            }
+            if(node.runtimeType != node.resolvedVariable.resolved_var_type) {
+                throw new Error(`Can't assign ${node.runtimeType} to ${node.resolvedVariable.resolved_var_type}`);
+            }
+            this.compile(node.value, stackframe);
+            this.assembly.POP("A");
+            this.assembly.saveVariable(node.resolvedVariable.path, stackframe, 0, "A");
+            this.assembly.PUSH("A");
         } else if(node.type == 'bin_add') {
             if(node.left.runtimeType != RUNTIME_UINT8 || node.right.runtimeType != RUNTIME_UINT8) {
                 throw new Error(`UNIMPLEMENTED: Can only compile addition of uint8 numbers`);
@@ -289,7 +341,7 @@ export class Compiler {
                 this.compile(node.else_branch, stackframe);
             }
             this.assembly.LABEL(end_if_label);
-        } else if(node.type == 'native_type') {
+        } else if(node.type == 'void_expr' || node.type == 'native_type') {
             return;
         } else {
             throw new Error(`dolphin/compiler/Compiler.compile(): Unknown node type '${(node as any).type}'`);

@@ -49,7 +49,10 @@ export class SymbolTableBuilder {
             if(node.else_branch) {
                 this.findDeclarations(node.else_branch, parent);
             }
-        } else if(node.type == 'integer' || node.type == 'symbol' || node.type == 'native_type') {
+        } else if(node.type == 'var_assign') {
+            this.findDeclarations(node.name, parent);
+            this.findDeclarations(node.value, parent);
+        } else if(node.type == 'void_expr' || node.type == 'integer' || node.type == 'symbol' || node.type == 'native_type') {
             return;
         } else {
             throw new Error(`SymbolTableBuilder.findDeclarations(): Unknown node type ${(node as any).type}`);
@@ -107,9 +110,23 @@ export class SymbolTableBuilder {
             } else if(node.resolvedSymbol.type == "scope") {
                 node.runtimeType = RUNTIME_VOID;
             } else {
-                throw new Error(`Resolved symbole '${(node.resolvedSymbol as Symbol).path}' doesn't have a type`);
+                throw new Error(`Resolved symbol '${(node.resolvedSymbol as Symbol).path}' doesn't have a type`);
             }
-        } else if(node.type == 'native_type') {
+        } else if(node.type == 'var_assign') {
+            this.resolveTypes(node.name, parent);
+            this.resolveTypes(node.value, parent);
+            if(!node.name.resolvedSymbol) {
+                throw new Error(`Can't resolve symbol ${node.name.name}`);
+            }
+            if(node.name.resolvedSymbol.type != 'variable') {
+                throw new Error(`Can only assign a value to a variable, but not to '${node.name.resolvedSymbol.type}'`);
+            }
+            node.resolvedVariable = node.name.resolvedSymbol;
+            if(!node.resolvedVariable.resolved_var_type) {
+                throw new Error(`Type of variable ${node.resolvedVariable.path} could not be resolved`);
+            }
+            node.runtimeType = node.resolvedVariable.resolved_var_type;
+        } else if(node.type == 'void_expr' || node.type == 'native_type') {
             return;
         } else {
             throw new Error(`SymbolTableBuilder.resolveTypes(): Unknown node type ${(node as any).type}`);

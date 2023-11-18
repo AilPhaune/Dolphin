@@ -2,8 +2,8 @@ import { Lexer } from "../lexer/lexer";
 import { Position, Token, TokenInteger, TokenKeyword, TokenSymbol, extendPosition, keyword, operator } from "../lexer/token";
 import { CancelableStream, cancelableOf } from "../stream/stream";
 import { StatementNode, StatementsNode } from "../ast/statements";
-import { VariableDeclarationNode } from "../ast/var";
-import { AdditionNode, ExpressionNode, IntegerNode, SubtractionNode, SymbolNode } from "../ast/expression";
+import { VariableAssignmentNode, VariableDeclarationNode } from "../ast/var";
+import { AdditionNode, ExpressionNode, IntegerNode, SubtractionNode, SymbolNode, VoidNode } from "../ast/expression";
 import { NativeTypeNode, TypeNode } from "../ast/type";
 import { ASTNode } from "../ast/ast";
 import { IfElseNode } from "../ast/controlflow";
@@ -115,13 +115,22 @@ export class Parser {
     }
 
     private parseAtom(): ExpressionNode {
+        if(this.isKeyword("void")) {
+            return new VoidNode(this.stream.next()?.position as Position);
+        }
         if(this.stream.peek()?.type == "integer") {
             const token = this.stream.next() as TokenInteger;
             return new IntegerNode(token.value, token.position);
         }
         if(this.stream.peek()?.type == "symbol") {
             const token = this.stream.next() as TokenSymbol;
-            return new SymbolNode(token.name, token.position);
+            const symbol = new SymbolNode(token.name, token.position);
+            if(this.stream.peek()?.type == "=") {
+                this.stream.next();
+                const expr = this.parseExpression();
+                return new VariableAssignmentNode(symbol, expr, extendPosition(symbol.position, expr.position));
+            }
+            return symbol;
         }
         if(this.isOperator('(')) {
             const paren = this.stream.next() as Token;
@@ -130,6 +139,18 @@ export class Parser {
                 throw new Error(`Expected ')', got ${this.stream.peek()?.type}`);
             }
             expr.position = extendPosition(paren.position, this.stream.next()?.position as Position);
+            return expr;
+        }
+        if(this.isOperator('{')) {
+            const brace = this.stream.next() as Token;
+            const expr = this.parseStatements();
+            if(!expr) {
+                throw new Error(`Couldn't parse statements`);
+            }
+            if(!this.isOperator('}')) {
+                throw new Error(`Expected '}', got ${this.stream.peek()?.type}`);
+            }
+            expr.position = extendPosition(brace.position, this.stream.next()?.position as Position);
             return expr;
         }
         throw new Error(`Expected expression, got ${this.stream.peek()?.type}`);

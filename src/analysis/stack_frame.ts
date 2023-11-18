@@ -62,10 +62,13 @@ export class StackFrameBuilder {
             if(node.else_branch) {
                 this.generate(node.else_branch, parentStackFrame);
             }
-        } else if(node.type == 'native_type' || node.type == 'integer' || node.type == 'symbol') {
+        } else if(node.type == 'var_assign') {
+            this.generate(node.name, parentStackFrame);
+            this.generate(node.value, parentStackFrame);
+        } else if(node.type == 'void_expr' || node.type == 'native_type' || node.type == 'integer' || node.type == 'symbol') {
             return;
         } else {
-            throw new Error(`StackFrameBuilder.generate(): Unknown node ${node}`);
+            throw new Error(`StackFrameBuilder.generate(): Unknown node ${(node as ASTNode).type}`);
         }
     }
 

@@ -44,7 +44,7 @@ export class SymbolTable {
         if(parts.length == 0) return this.root;
         for(let i = 0; i < parts.length; i++) {
             const child = parent.children[parts[i]];
-            if(child.type != "scope") {
+            if(!child || child.type != "scope") {
                 return null;
             }
             parent = child;

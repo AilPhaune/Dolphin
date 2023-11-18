@@ -14,10 +14,10 @@ const replacer = (key: string, value: any) => {
         return value.toString();
     }
     if(key == "position") {
-        return `${value.source}:${value.fromLine}:${value.fromLineIdx}->${value.toLine}:${value.toLineIdx}`;
+        return `${value?.source}:${value?.fromLine}:${value?.fromLineIdx}->${value?.toLine}:${value?.toLineIdx}`;
     }
     if(key == "generatedScope") {
-        return value.path;
+        return value?.path;
     }
     if(key == "table") {
         return undefined;
@@ -32,6 +32,7 @@ const lexer = new Lexer(input, "input.prgm");
 const parser = new Parser(lexer);
 
 const ast = parser.parseAST();
+fs.writeFileSync("raw_ast.json", JSON.stringify(ast, replacer, 4));
 
 const st_builder = new SymbolTableBuilder();
 st_builder.addAST(ast);

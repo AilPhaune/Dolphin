@@ -1,9 +1,8 @@
-let x: u8 = 30;
-
-{
-    let y: u8 = 81;
-    let z: u8 = 42;
-    {
-        let abcde: u8 = x + y - z;
-    }
-}
+let x: u8 = 5;
+let y: u8 = 9;
+let z: u8 = {
+    let off: u8 = 3;
+    x + y + off;
+};
+x = x + 1;
+void;
