@@ -5,7 +5,6 @@ import { toArray } from './src/stream/collectors';
 import { collect } from './src/stream/stream';
 import { SymbolTableBuilder } from './src/analysis/st_builder';
 import { StatementsNode } from './src/ast/statements';
-import { VariableDeclarationNode } from './src/ast/var';
 import { StackFrame, StackFrameBuilder } from './src/analysis/stack_frame';
 import { Assembly, Compiler } from './src/compile/dolphin/compiler';
 
@@ -28,6 +27,8 @@ const replacer = (key: string, value: any) => {
 const input = fs.readFileSync("input.prgm").toString('utf-8');
 console.log("----------\n\n" + input + "\n\n----------\n");
 const lexer = new Lexer(input, "input.prgm");
+
+fs.writeFileSync("tokens.json", JSON.stringify(collect(new Lexer(input, "input.prgm"), toArray()), replacer, 4));
 
 const parser = new Parser(lexer);
 

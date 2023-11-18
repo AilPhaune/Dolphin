@@ -5,7 +5,7 @@ while (x) {
         void;
     } else {
         break;
-    };
+    }
 }
 
 while (1) {}

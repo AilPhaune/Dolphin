@@ -1,4 +1,4 @@
-import { OPERATORS, KEYWORDS, Token, TokenInteger, TokenKeyword, TokenOp, TokenSymbol, Position, extendPosition, TokenEof } from "./token.ts";
+import { OPERATORS, KEYWORDS, Token, TokenInteger, TokenKeyword, TokenOp, TokenSymbol, Position, extendPosition, TokenEof, TokenString } from "./token.ts";
 import { Stream } from "../stream/stream.ts";
 
 const DIGITS = "0123456789";
@@ -51,6 +51,53 @@ export class Lexer implements Stream<Token> {
             i++;
         }
         this.input = this.input.substring(i);
+        if(!this.hasInput()) {
+            this.eof = true;
+            return {
+                type: "eof",
+                position: this.createPosition()
+            } as TokenEof;
+        }
+        if(this.input[0] == '"') {
+            const pos = this.createPosition();
+            let i = 0;
+            let escape = false;
+            this.input = this.input.substring(1);
+            let value = "";
+            for(; this.input[i] != '"' || escape; i++) {
+                if(this.input[i] == '\n') {
+                    throw new Error('No newline allowed in string');
+                }
+                if(i >= this.input.length - 1) {
+                    throw new Error('Unterminated string');
+                }
+                if(escape) {
+                    escape = false;
+                    value += {"n": "\n", "\\": "\\", "t": "\t", "b": "\b", "r": "\r", "a": "\a"}[this.input[i]] ?? this.input[i];
+                    continue;
+                }
+                if(this.input[i] == '\\') {
+                    escape = true;
+                    continue;
+                }
+                value += this.input[i];
+            }
+            if(this.input[i] != '"') {
+                throw new Error('Unterminated string');
+            }
+            i++;
+            this.input = this.input.substring(i);
+            this.lineIdx += i;
+            this.idx += i;
+            const pos2 = this.createPosition();
+            this.idx++;
+            this.lineIdx++;
+            return {
+                type: "string",
+                value,
+                position: extendPosition(pos, pos2)
+            } as TokenString;
+        }
         for(const op of OPERATORS) {
             if(this.input.startsWith(op)) {
                 let position: Position = this.createPosition();

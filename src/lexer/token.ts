@@ -1,4 +1,4 @@
-export type Token = TokenEof | TokenOp | TokenInteger | TokenSymbol | TokenKeyword;
+export type Token = TokenEof | TokenOp | TokenInteger | TokenSymbol | TokenKeyword | TokenString;
 
 export type keyword = "let" | "u8" | "u16" | "void" | "if" | "else" | "while" | "continue" | "break";
 export type operator = ";" | "{" | "}" | "(" | ")" | "+" | "-" | "=" | ":";
@@ -24,6 +24,12 @@ export function extendPosition(start: Position, end: Position): Position {
 
 export interface TokenEof {
     type: "eof";
+    position: Position;
+}
+
+export interface TokenString {
+    type: "string";
+    value: string;
     position: Position;
 }
 
