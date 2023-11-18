@@ -3,11 +3,11 @@ import { Position, Token, TokenInteger, TokenKeyword, TokenString, TokenSymbol, 
 import { CancelableStream, cancelableOf } from "../stream/stream";
 import { StatementNode, StatementsNode } from "../ast/statements";
 import { VariableAssignmentNode, VariableDeclarationNode } from "../ast/var";
-import { AdditionNode, ExpressionNode, IntegerNode, SubtractionNode, SymbolNode, VoidNode } from "../ast/expression";
+import { AdditionNode, ExpressionNode, IntegerNode, StringNode, SubtractionNode, SymbolNode, VoidNode } from "../ast/expression";
 import { NativeTypeNode, TypeNode } from "../ast/type";
-import { ASTNode } from "../ast/ast";
+import { ASTNode, AstNode } from "../ast/ast";
 import { BreakNode, ContinueNode, IfElseNode, WhileLoopNode } from "../ast/controlflow";
-import { AssemblyNode, InstructionNode, LitteralInstructionNode } from "../ast/asm";
+import { ASMNode, AsmCommandNode, AssemblyNode, InstructionNode, LitteralInstructionNode } from "../ast/asm";
 
 export class Parser {
 
@@ -121,6 +121,22 @@ export class Parser {
             const tok = this.stream.next() as TokenString;
             return new LitteralInstructionNode(tok.value, tok.position);
         }
+        if(this.stream.peek()?.type == ':') {
+            const colon = this.stream.next() as TokenSymbol;
+            if(this.stream.peek()?.type != 'string') {
+                throw new Error(`Expected assembly command (string litteral), got ${this.stream.peek()?.type}`);
+            }
+            const command = this.stream.next() as TokenString;
+            let position = extendPosition(colon.position, command.position);
+            const args: ExpressionNode[] = [];
+            while(this.stream.peek()?.type == ':') {
+                this.stream.next();
+                const expression = this.parseExpression();
+                args.push(expression);
+                position = extendPosition(position, expression.position);
+            }
+            return new AsmCommandNode(command, args, position);
+        }
         return null;
     }
 
@@ -182,6 +198,10 @@ export class Parser {
         if(this.stream.peek()?.type == "integer") {
             const token = this.stream.next() as TokenInteger;
             return new IntegerNode(token.value, token.position);
+        }
+        if(this.stream.peek()?.type == "string") {
+            const token = this.stream.next() as TokenString;
+            return new StringNode(token.value, token.position);
         }
         if(this.stream.peek()?.type == "symbol") {
             const token = this.stream.next() as TokenSymbol;

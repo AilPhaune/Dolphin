@@ -1,6 +1,7 @@
-import { RUNTIME_UINT8, RuntimeType, getTypeSizeBytes } from "../../analysis/rt_type";
+import { RUNTIME_UINT8, RuntimeType, areTypesEqual, getTypeSizeBytes } from "../../analysis/rt_type";
 import { StackFrame } from "../../analysis/stack_frame";
 import { SymbolTable } from "../../analysis/symbol_table";
+import { AsmCommandNode } from "../../ast/asm";
 import { ASTNode } from "../../ast/ast";
 import fs from "fs";
 
@@ -53,6 +54,14 @@ export class Assembly {
 
     integer(value: number): string {
         return `#${value}`;
+    }
+
+    character(value: string): string {
+        return `#${value.charCodeAt(0)}`;
+    }
+
+    hex(value: string) {
+        return `H'${value}`;
     }
 
     setupStackframe(frame: StackFrame) {
@@ -246,9 +255,15 @@ export class Assembly {
 
 export const ASM_BLOCK_COMPILER_NAME = "dolphin";
 
-export class Compiler {
-    constructor(public symbol_table: SymbolTable, public assembly: Assembly) {
+export const FLAG_EXPERIMENTAL_STRINGS = "--experimental-strings";
 
+export class Compiler {
+    constructor(public symbol_table: SymbolTable, public assembly: Assembly, public readonly flags: string[] = []) {
+
+    }
+
+    getFlag(flag: string) {
+        return this.flags.includes(flag);
     }
 
     compile(node: ASTNode, stackframe: StackFrame): void {
@@ -292,7 +307,7 @@ export class Compiler {
                 throw new Error(`Can't compile variable declaration because no scope was assigned to the node ${node}`);
             }
             if(node.value) {
-                if(node.value.runtimeType != node.generatedScope.resolved_var_type) {
+                if(!areTypesEqual(node.value.runtimeType, node.generatedScope.resolved_var_type)) {
                     throw new Error(`Can't assign ${JSON.stringify(node.runtimeType)} to ${JSON.stringify(node.generatedScope.resolved_var_type)}`);
                 }
                 this.compile(node.value, stackframe);
@@ -303,7 +318,7 @@ export class Compiler {
             if(!node.resolvedVariable) {
                 throw new Error(`Can't compile variable assignment because the variable ${node.name.name} couldn't be resolved`);
             }
-            if(node.runtimeType != node.resolvedVariable.resolved_var_type) {
+            if(!areTypesEqual(node.runtimeType, node.resolvedVariable.resolved_var_type)) {
                 throw new Error(`Can't assign ${JSON.stringify(node.runtimeType)} to ${JSON.stringify(node.resolvedVariable.resolved_var_type)}`);
             }
             this.compile(node.value, stackframe);
@@ -311,7 +326,7 @@ export class Compiler {
             this.assembly.saveVariable(node.resolvedVariable.path, stackframe, 0, "A");
             this.assembly.PUSH("A");
         } else if(node.type == 'bin_add') {
-            if(node.left.runtimeType != RUNTIME_UINT8 || node.right.runtimeType != RUNTIME_UINT8) {
+            if(!areTypesEqual(node.left.runtimeType, RUNTIME_UINT8) || !areTypesEqual(node.right.runtimeType, RUNTIME_UINT8)) {
                 throw new Error(`UNIMPLEMENTED: Can only compile addition of uint8 numbers`);
             }
             this.compile(node.left, stackframe);
@@ -321,7 +336,7 @@ export class Compiler {
             this.assembly.ADD("B", "A");
             this.assembly.PUSH("A");
         } else if(node.type == 'bin_sub') {
-            if(node.left.runtimeType != RUNTIME_UINT8 || node.right.runtimeType != RUNTIME_UINT8) {
+            if(!areTypesEqual(node.left.runtimeType, RUNTIME_UINT8) || !areTypesEqual(node.right.runtimeType, RUNTIME_UINT8)) {
                 throw new Error(`UNIMPLEMENTED: Can only compile subtraction of uint8 numbers`);
             }
             this.compile(node.left, stackframe);
@@ -331,13 +346,21 @@ export class Compiler {
             this.assembly.SUB("A", "B"); // left - right
             this.assembly.PUSH("B");
         } else if(node.type == 'integer') {
-            if(node.runtimeType != RUNTIME_UINT8) {
+            if(!areTypesEqual(node.runtimeType, RUNTIME_UINT8)) {
                 throw new Error(`UNIMPLEMENTED: Only uint8 is supported, got ${node.runtimeType}`);
             }
             this.assembly.MOV(this.assembly.integer(Number(node.value)), "A");
             this.assembly.PUSH("A");
+        } else if(node.type == 'string') {
+            if(!this.getFlag(FLAG_EXPERIMENTAL_STRINGS)) {
+                throw new Error(`String support is experimental. Use flag ${FLAG_EXPERIMENTAL_STRINGS} if you wan't to use strings.`);
+            }
+            for(let i = node.value.length - 1; i >= 0; i--) {
+                this.assembly.MOV(this.assembly.character(node.value[i]), "A");
+                this.assembly.PUSH("A");
+            }
         } else if(node.type == 'symbol') {
-            if(node.runtimeType != RUNTIME_UINT8) {
+            if(!areTypesEqual(node.runtimeType, RUNTIME_UINT8)) {
                 throw new Error(`UNIMPLEMENTED: Only uint8 is supported, got ${node.runtimeType}`);
             }
             if(!node.resolvedSymbol) {
@@ -346,7 +369,7 @@ export class Compiler {
             this.assembly.readVariable(node.resolvedSymbol.path, stackframe, 0, "A");
             this.assembly.PUSH("A");
         } else if(node.type == 'if_else') {
-            if(node.condition.runtimeType != RUNTIME_UINT8) {
+            if(!areTypesEqual(node.condition.runtimeType, RUNTIME_UINT8)) {
                 throw new Error(`UNIMPLEMENTED: Only uint8 is supported for if/else conditions, got ${node.runtimeType}`);
             }
             this.compile(node.condition, stackframe);
@@ -363,7 +386,7 @@ export class Compiler {
             }
             this.assembly.LABEL(end_if_label);
         } else if(node.type == 'while_loop') {
-            if(node.condition.runtimeType != RUNTIME_UINT8) {
+            if(!areTypesEqual(node.condition.runtimeType, RUNTIME_UINT8)) {
                 throw new Error(`UNIMPLEMENTED: Only uint8 is supported for while loop conditions, got ${node.runtimeType}`);
             }
             const condition_label = this.assembly.nextLabel("WHILE_LOOP");
@@ -402,12 +425,137 @@ export class Compiler {
                     this.compile(inst, stackframe);
                 }
             }
+        } else if(node.type == 'asm_command') {
+            if(node.command.value == "MOVE") {
+                this.asmCommandMove(node, stackframe);
+            } else if(node.command.value == "PUSH") {
+                this.asmCommandPush(node, stackframe);
+            } else if(node.command.value == "POP") {
+                this.asmCommandPop(node, stackframe);
+            } else if(node.command.value == "ADD") {
+                this.asmCommandAddSub(node, stackframe, "ADD");
+            } else if(node.command.value == "SUB") {
+                this.asmCommandAddSub(node, stackframe, "SUB");
+            } else {
+                throw new Error(`Unknown assembly command ${node.command.value}`);
+            }
         } else if(node.type == 'litteral_instruction') {
+            if(/^(((\s*)(PUSH)|(POP))|((\s*)((MOVE)|(SUB)|(ADD))(\s+)(.*),(\s*)(SP)))/ig.test(node.value)) {
+                throw new Error(`To avoid corrupting the stack, operations that modify it can only be done using the command, not in a litteral instruction`);
+            }
             this.assembly.write(node.value);
         } else if(node.type == 'void_expr' || node.type == 'native_type') {
             return;
         } else {
             throw new Error(`dolphin/compiler/Compiler.compile(): Unknown node type '${(node as any).type}'`);
+        }
+    }
+
+    private asmCommandAddSub(node: AsmCommandNode, stackframe: StackFrame, type: "ADD" | "SUB") {
+        if(node.args.length != 2) {
+            throw new Error(`Assembly command ${type} expects 2 arguments, got ${node.args.length}`);
+        }
+        const [value, dest] = node.args;
+        let from: string;
+        let pushedFrom = false;
+        if(value.type == 'string') {
+            if(!(["X", "Y", "A", "B"].includes(value.value))) {
+                throw new Error(`Invalid register, valid registers are X, Y, A and B`);
+            }
+            from = value.value;
+        } else {
+            from = (dest.type == "string" && dest.value == "A") ? "B" : "A";
+            this.assembly.PUSH(from);
+            pushedFrom = true;
+            if(from != 'A') {
+                this.assembly.PUSH('A');
+            }
+            this.compile(value, stackframe);
+            this.assembly.POP(from);
+            if(from != 'A') {
+                this.assembly.POP('A');
+            }
+        }
+        if(dest.type == "string") {
+            if(!(["X", "Y", "A", "B"].includes(dest.value))) {
+                throw new Error(`Invalid register, valid registers are X, Y, A and B`);
+            }
+            console.log('---', from)
+            this.assembly[type](from, dest.value);
+        } else if(dest.type == "symbol") {
+            if(!dest.runtimeType) {
+                throw new Error(`Destination doesn't have a runtime type`);
+            }
+            if(!dest.resolvedSymbol) {
+                throw new Error(`Destination couldn't be resolved`);
+            }
+            const size = getTypeSizeBytes(dest.runtimeType);
+            if(size != 1) {
+                throw new Error(`Assembly command ${type}: Only 1 byte variables supported, got ${size}`);
+            }
+            const to = from == "B" ? "A" : "B";
+            this.assembly.PUSH(to);
+            this.assembly.readVariable(dest.resolvedSymbol.path, stackframe, 0, to);
+            this.assembly[type](from, to);
+            this.assembly.saveVariable(dest.resolvedSymbol.path, stackframe, 0, to);
+            this.assembly.POP(to);
+        } else {
+            throw new Error(`Assembly command ${type} expects second argument 'destination' to be either an output register or a variable, got ${dest.type}`);
+        }
+        if(pushedFrom) {
+            this.assembly.POP(from);
+        }
+    }
+
+    private asmCommandPush(node: AsmCommandNode, stackframe: StackFrame) {
+        for(let i = 0; i < node.args.length; i++) {
+            const arg = node.args[i];
+            if(arg.type != "string") {
+                this.compile(arg, stackframe);
+                continue;
+            }
+            if(!(["X", "Y", "A", "B"].includes(arg.value))) {
+                throw new Error(`Invalid register, valid registers are X, Y, A and B`);
+            }
+            this.assembly.PUSH(arg.value);
+        }
+    }
+
+    private asmCommandPop(node: AsmCommandNode, stackframe: StackFrame) {
+        for(let i = 0; i < node.args.length; i++) {
+            const arg = node.args[i];
+            if(arg.type != "string") {
+                throw new Error(`Expected destination register as string, got ${arg.type}`);
+            }
+            if(!(["X", "Y", "A", "B"].includes(arg.value))) {
+                throw new Error(`Invalid destination register, valid registers are X, Y, A and B`);
+            }
+            this.assembly.PUSH(arg.value);
+        }
+    }
+
+    private asmCommandMove(node: AsmCommandNode, stackframe: StackFrame) {
+        const [value, ...dests] = node.args;
+        if(!value.runtimeType) {
+            throw new Error(`Value to move doesn't have a runtime type`);
+        }
+        const valueSize = getTypeSizeBytes(value.runtimeType);
+        if(valueSize <= 0 || valueSize > 4) {
+            throw new Error(`Can only move a value with size between 1 and 4, got ${valueSize}`);
+        }
+        if(dests.length != 1) {
+            throw new Error(`Invalid number of destination registers given (${dests.length - 1}), expected ${valueSize}`);
+        }
+        this.compile(value, stackframe);
+        for(let i = 0; i < dests.length; i++) {
+            const dest = dests[i];
+            if(dest.type != "string") {
+                throw new Error(`Expected destination register as string, got ${dest.type}`);
+            }
+            if(!(["X", "Y", "A", "B"].includes(dest.value))) {
+                throw new Error(`Invalid destination register, valid registers are X, Y, A and B`);
+            }
+            this.assembly.POP(dest.value);
         }
     }
 }

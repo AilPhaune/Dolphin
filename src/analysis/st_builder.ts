@@ -65,7 +65,11 @@ export class SymbolTableBuilder {
             for(const inst of node.instructions) {
                 this.findDeclarations(inst, parent);
             }
-        } else if(node.type == 'litteral_instruction' || node.type == 'break_loop' || node.type == 'continue_loop' || node.type == 'void_expr' || node.type == 'integer' || node.type == 'symbol' || node.type == 'native_type') {
+        } else if(node.type == 'asm_command') {
+            for(const arg of node.args) {
+                this.findDeclarations(arg, parent);
+            }
+        } else if(node.type == 'litteral_instruction' || node.type == 'break_loop' || node.type == 'continue_loop' || node.type == 'void_expr' || node.type == 'integer' || node.type == 'string' || node.type == 'symbol' || node.type == 'native_type') {
             return;
         } else {
             throw new Error(`SymbolTableBuilder.findDeclarations(): Unknown node type ${(node as any).type}`);
@@ -112,8 +116,6 @@ export class SymbolTableBuilder {
                 }
             }
             node.runtimeType = node.if_branch.runtimeType;
-        } else if(node.type == 'integer') {
-            node.runtimeType = RUNTIME_UINT8;
         } else if(node.type == 'symbol') {
             node.resolvedSymbol = SymbolTable.resolveSymbol(parent, node.name);
             if(!node.resolvedSymbol) {
@@ -164,7 +166,11 @@ export class SymbolTableBuilder {
                 this.resolveTypes(inst, parent);
             }
             node.runtimeType = RUNTIME_VOID;
-        } else if(node.type == 'void_expr' || node.type == 'native_type' || node.type == 'litteral_instruction') {
+        } else if(node.type == 'asm_command') {
+            for(const arg of node.args) {
+                this.resolveTypes(arg, parent);
+            }
+        } else if(node.type == 'void_expr' || node.type == 'native_type' || node.type == 'litteral_instruction' || node.type == 'integer' || node.type == 'string') {
             return;
         } else {
             throw new Error(`SymbolTableBuilder.resolveTypes(): Unknown node type ${(node as any).type}`);

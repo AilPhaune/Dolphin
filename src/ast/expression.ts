@@ -1,4 +1,4 @@
-import { RUNTIME_UINT16, RUNTIME_UINT8, RUNTIME_VOID, RuntimeType, RuntimeTypeInteger, RuntimeVoid } from "../analysis/rt_type";
+import { RUNTIME_UINT16, RUNTIME_UINT8, RUNTIME_VOID, RuntimeType, RuntimeTypeInteger, RuntimeTypeString, RuntimeVoid } from "../analysis/rt_type";
 import { Symbol } from "../analysis/symbol_table";
 import { Position } from "../lexer/token";
 import { AstNode } from "./ast";
@@ -6,7 +6,7 @@ import { IfElseNode } from "./controlflow";
 import { StatementsNode } from "./statements";
 import { VariableAssignmentNode } from "./var";
 
-export type ExpressionNode = IntegerNode | SymbolNode | StatementsNode | AdditionNode | SubtractionNode | IfElseNode | VariableAssignmentNode | VoidNode;
+export type ExpressionNode = IntegerNode | StringNode | SymbolNode | StatementsNode | AdditionNode | SubtractionNode | IfElseNode | VariableAssignmentNode | VoidNode;
 
 export class AdditionNode implements AstNode {
     public readonly type: "bin_add" = "bin_add";
@@ -31,6 +31,17 @@ export class IntegerNode implements AstNode {
         } else {
             this.runtimeType = null;
         }
+    }
+}
+
+export class StringNode implements AstNode {
+    public readonly type: "string" = "string";
+    public runtimeType: RuntimeTypeString | null;
+    constructor(public readonly value: string, public position: Position) {
+        this.runtimeType = {
+            type: "runtime_string",
+            length: value.length
+        };
     }
 }
 
