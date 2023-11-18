@@ -26,6 +26,16 @@ export class Assembly {
             this.pushPopWait = null;
             this.write(v);
         }
+        if(value.includes('\n')) {
+            const values = value.split('\n');
+            for(const v of values) {
+                this.write(v);
+            }
+            return;
+        }
+        if(!value.includes(':')) {
+            this.output += '    '; // 4 space indentation if it's not a label
+        }
         this.output += value;
         this.output += "\n";
         this.lastPoped = "";
