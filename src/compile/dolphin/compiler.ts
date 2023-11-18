@@ -273,6 +273,9 @@ export class Compiler {
             if(!node.generatedScope) {
                 throw new Error(`Can't compile variable declaration because no scope was assigned to the node ${node}`);
             }
+            if(node.runtimeType != node.generatedScope.resolved_var_type) {
+                throw new Error(`Can't assign ${JSON.stringify(node.runtimeType)} to ${JSON.stringify(node.generatedScope.resolved_var_type)}`);
+            }
             if(node.value) {
                 this.compile(node.value, stackframe);
             }
@@ -283,7 +286,7 @@ export class Compiler {
                 throw new Error(`Can't compile variable assignment because the variable ${node.name.name} couldn't be resolved`);
             }
             if(node.runtimeType != node.resolvedVariable.resolved_var_type) {
-                throw new Error(`Can't assign ${node.runtimeType} to ${node.resolvedVariable.resolved_var_type}`);
+                throw new Error(`Can't assign ${JSON.stringify(node.runtimeType)} to ${JSON.stringify(node.resolvedVariable.resolved_var_type)}`);
             }
             this.compile(node.value, stackframe);
             this.assembly.POP("A");

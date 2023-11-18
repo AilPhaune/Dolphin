@@ -1,8 +1,3 @@
-let x: u8 = 5;
-let y: u8 = 9;
-let z: u8 = {
-    let off: u8 = 3;
-    x + y + off;
+let x: u8 = {
+    void;
 };
-x = x + 1;
-void;
