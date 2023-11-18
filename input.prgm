@@ -1,5 +1,9 @@
 let x: u8 = 10;
 while (x) {
+    asm "dolphin" {
+        "MOVE #0, B";
+        "CALL _DisplayHexaDigit";
+    }
     if (x - 5) {
         x = x - 1;
         void;
@@ -8,4 +12,6 @@ while (x) {
     }
 }
 
-while (1) {}
+asm "dolphin" {
+    "HALT"
+}

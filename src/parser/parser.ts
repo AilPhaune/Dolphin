@@ -1,5 +1,5 @@
 import { Lexer } from "../lexer/lexer";
-import { Position, Token, TokenInteger, TokenKeyword, TokenSymbol, extendPosition, keyword, operator } from "../lexer/token";
+import { Position, Token, TokenInteger, TokenKeyword, TokenString, TokenSymbol, extendPosition, keyword, operator } from "../lexer/token";
 import { CancelableStream, cancelableOf } from "../stream/stream";
 import { StatementNode, StatementsNode } from "../ast/statements";
 import { VariableAssignmentNode, VariableDeclarationNode } from "../ast/var";
@@ -7,6 +7,7 @@ import { AdditionNode, ExpressionNode, IntegerNode, SubtractionNode, SymbolNode,
 import { NativeTypeNode, TypeNode } from "../ast/type";
 import { ASTNode } from "../ast/ast";
 import { BreakNode, ContinueNode, IfElseNode, WhileLoopNode } from "../ast/controlflow";
+import { AssemblyNode, InstructionNode, LitteralInstructionNode } from "../ast/asm";
 
 export class Parser {
 
@@ -77,6 +78,9 @@ export class Parser {
         if(this.isKeyword("continue")) {
             return new ContinueNode(this.stream.next()?.position as Position);
         }
+        if(this.isKeyword("asm")) {
+            return this.parseAssembly();
+        }
         return this.parseExpression();
     }
 
@@ -85,6 +89,39 @@ export class Parser {
             return this.parseIfStatement();
         }
         return this.parseAddition();
+    }
+
+    private parseAssembly(): AssemblyNode {
+        const kw_asm = this.stream.next() as TokenKeyword;
+        const targets: string[] = [];
+        while(this.stream.peek()?.type == "string") {
+            targets.push((this.stream.next() as TokenString).value);
+        }
+        if(!this.isOperator('{')) {
+            throw new Error(`Expected '{', got ${this.stream.peek()?.type}`);
+        }
+        this.stream.next();
+        const instructions: InstructionNode[] = [];
+        while(this.stream.peek()?.type != '}' || this.stream.peek()?.type == ';') {
+            while(this.stream.peek()?.type == ";") this.stream.next();
+            if(this.stream.peek()?.type == "}") break;
+            if(this.stream.peek()?.type == "eof") break;
+            const inst = this.parseAsmInstruction();
+            if(!inst) break;
+            instructions.push(inst);
+        }
+        if(!this.isOperator('}')) {
+            throw new Error(`Expected '}' or assembly instruction, got ${this.stream.peek()?.type}`);
+        }
+        return new AssemblyNode(targets, instructions, extendPosition(kw_asm.position, this.stream.next()?.position as Position));
+    }
+
+    private parseAsmInstruction(): InstructionNode | null {
+        if(this.stream.peek()?.type == 'string') {
+            const tok = this.stream.next() as TokenString;
+            return new LitteralInstructionNode(tok.value, tok.position);
+        }
+        return null;
     }
 
     private parseWhileLoop(): WhileLoopNode {

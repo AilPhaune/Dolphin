@@ -61,7 +61,11 @@ export class SymbolTableBuilder {
                 }
                 node.loop_body.generatedScope.specialType = 'loop';
             }
-        } else if(node.type == 'break_loop' || node.type == 'continue_loop' || node.type == 'void_expr' || node.type == 'integer' || node.type == 'symbol' || node.type == 'native_type') {
+        } else if(node.type == 'assembly') {
+            for(const inst of node.instructions) {
+                this.findDeclarations(inst, parent);
+            }
+        } else if(node.type == 'litteral_instruction' || node.type == 'break_loop' || node.type == 'continue_loop' || node.type == 'void_expr' || node.type == 'integer' || node.type == 'symbol' || node.type == 'native_type') {
             return;
         } else {
             throw new Error(`SymbolTableBuilder.findDeclarations(): Unknown node type ${(node as any).type}`);
@@ -155,7 +159,12 @@ export class SymbolTableBuilder {
                 throw new Error(`Attempt to use loop control while not in a loop`);
             }
             node.runtimeType = RUNTIME_VOID;
-        } else if(node.type == 'void_expr' || node.type == 'native_type') {
+        } else if(node.type == 'assembly') {
+            for(const inst of node.instructions) {
+                this.resolveTypes(inst, parent);
+            }
+            node.runtimeType = RUNTIME_VOID;
+        } else if(node.type == 'void_expr' || node.type == 'native_type' || node.type == 'litteral_instruction') {
             return;
         } else {
             throw new Error(`SymbolTableBuilder.resolveTypes(): Unknown node type ${(node as any).type}`);

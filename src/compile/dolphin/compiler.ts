@@ -244,6 +244,8 @@ export class Assembly {
     }
 }
 
+export const ASM_BLOCK_COMPILER_NAME = "dolphin";
+
 export class Compiler {
     constructor(public symbol_table: SymbolTable, public assembly: Assembly) {
 
@@ -394,6 +396,14 @@ export class Compiler {
                 throw new Error(`Can't compile '${node.type.replaceAll('_loop', '')}' node because it was associated with didn't provide a jump label for the operation`);
             }
             this.assembly.JMP(label);
+        } else if(node.type == 'assembly') {
+            if(node.targets.includes(ASM_BLOCK_COMPILER_NAME)) {
+                for(const inst of node.instructions) {
+                    this.compile(inst, stackframe);
+                }
+            }
+        } else if(node.type == 'litteral_instruction') {
+            this.assembly.write(node.value);
         } else if(node.type == 'void_expr' || node.type == 'native_type') {
             return;
         } else {

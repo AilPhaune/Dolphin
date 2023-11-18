@@ -68,7 +68,11 @@ export class StackFrameBuilder {
         } else if(node.type == 'while_loop') {
             this.generate(node.condition, parentStackFrame);
             this.generate(node.loop_body, parentStackFrame);
-        } else if(node.type == 'break_loop' || node.type == 'continue_loop' || node.type == 'void_expr' || node.type == 'native_type' || node.type == 'integer' || node.type == 'symbol') {
+        } else if(node.type == 'assembly') {
+            for(const inst of node.instructions) {
+                this.generate(inst, parentStackFrame);
+            }
+        } else if(node.type == 'litteral_instruction' || node.type == 'break_loop' || node.type == 'continue_loop' || node.type == 'void_expr' || node.type == 'native_type' || node.type == 'integer' || node.type == 'symbol') {
             return;
         } else {
             throw new Error(`StackFrameBuilder.generate(): Unknown node ${(node as ASTNode).type}`);
