@@ -1,21 +1,9 @@
-let x: u8 = 10;
-while (x) {
-    if (x - 2) {
-        x = x - 1;
-        void;
-    } else {
-        break;
-    }
-    if (x - 7) {} else {
-        continue;
-    }
-    asm "dolphin" {
-        : "MOVE" : x : "A";
-        "MOVE #0, B";
-        "CALL _DisplayHexaDigit";
-    }
-}
+a();
 
 asm "dolphin" {
-    "HALT"
+    "HALT";
+}
+
+function a(): void {
+
 }

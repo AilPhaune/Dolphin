@@ -3,10 +3,11 @@ import { Symbol } from "../analysis/symbol_table";
 import { Position } from "../lexer/token";
 import { AstNode } from "./ast";
 import { IfElseNode } from "./controlflow";
+import { FunctionCallNode } from "./functions";
 import { StatementsNode } from "./statements";
 import { VariableAssignmentNode } from "./var";
 
-export type ExpressionNode = IntegerNode | StringNode | SymbolNode | StatementsNode | AdditionNode | SubtractionNode | IfElseNode | VariableAssignmentNode | VoidNode;
+export type ExpressionNode = IntegerNode | StringNode | SymbolNode | StatementsNode | AdditionNode | SubtractionNode | IfElseNode | VariableAssignmentNode | VoidNode | FunctionCallNode;
 
 export class AdditionNode implements AstNode {
     public readonly type: "bin_add" = "bin_add";

@@ -6,8 +6,9 @@ import { AstNode } from "./ast";
 import { BreakNode, ContinueNode, WhileLoopNode } from "./controlflow";
 import { ExpressionNode } from "./expression";
 import { VariableDeclarationNode } from "./var";
+import { FunctionDeclarationNode } from "./functions";
 
-export type StatementNode = StatementsNode | VariableDeclarationNode | ExpressionNode | WhileLoopNode | BreakNode | ContinueNode | ASMNode;
+export type StatementNode = StatementsNode | VariableDeclarationNode | ExpressionNode | WhileLoopNode | BreakNode | ContinueNode | ASMNode | FunctionDeclarationNode;
 
 export class StatementsNode implements AstNode {
     public readonly type: "statements" = "statements";

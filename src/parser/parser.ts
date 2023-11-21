@@ -5,9 +5,10 @@ import { StatementNode, StatementsNode } from "../ast/statements";
 import { VariableAssignmentNode, VariableDeclarationNode } from "../ast/var";
 import { AdditionNode, ExpressionNode, IntegerNode, StringNode, SubtractionNode, SymbolNode, VoidNode } from "../ast/expression";
 import { NativeTypeNode, TypeNode } from "../ast/type";
-import { ASTNode, AstNode } from "../ast/ast";
+import { ASTNode } from "../ast/ast";
 import { BreakNode, ContinueNode, IfElseNode, WhileLoopNode } from "../ast/controlflow";
-import { ASMNode, AsmCommandNode, AssemblyNode, InstructionNode, LitteralInstructionNode } from "../ast/asm";
+import { AsmCommandNode, AssemblyNode, InstructionNode, LitteralInstructionNode } from "../ast/asm";
+import { FunctionCallNode, FunctionDeclarationNode, FunctionParameter } from "../ast/functions";
 
 export class Parser {
 
@@ -81,6 +82,9 @@ export class Parser {
         if(this.isKeyword("asm")) {
             return this.parseAssembly();
         }
+        if(this.isKeyword("function")) {
+            return this.parseFunctionDeclaration();
+        }
         return this.parseExpression();
     }
 
@@ -89,6 +93,60 @@ export class Parser {
             return this.parseIfStatement();
         }
         return this.parseAddition();
+    }
+
+    private parseFunctionDeclaration(): FunctionDeclarationNode {
+        const kw_function = this.stream.next() as TokenKeyword;
+        if(this.stream.peek()?.type != 'symbol') {
+            throw new Error(`Expected parameter name or ')', got ${this.stream.peek()?.type}`);
+        }
+        const name = this.stream.next() as TokenSymbol;
+        if(!this.isOperator('(')) {
+            throw new Error(`Expected '(', got ${this.stream.peek()?.type}`);
+        }
+        this.stream.next();
+        const parameters: FunctionParameter[] = [];
+        if(!this.isOperator(')')) {
+            while(true) {
+                if(this.stream.peek()?.type != 'symbol') {
+                    throw new Error(`Expected parameter name or ')', got ${this.stream.peek()?.type}`);
+                }
+                const name = this.stream.next() as TokenSymbol;
+                if(!this.isOperator(':')) {
+                    throw new Error(`Expected ':', got ${this.stream.peek()?.type}`);
+                }
+                this.stream.next();
+                const type = this.parseType();
+                parameters.push({
+                    name: name.name, type, position: extendPosition(name.position, type.position)
+                });
+                if(this.isOperator(')')) {
+                    break;
+                }
+                if(!this.isOperator(',')) {
+                    throw new Error(`Expected ',' or ')', got ${this.stream.peek()?.type}`);
+                }
+            }
+        }
+        this.stream.next();
+        if(!this.isOperator(':')) {
+            throw new Error(`Expected ':', got ${this.stream.peek()?.type}`);
+        }
+        this.stream.next();
+        const ret_type = this.parseType();
+        if(!this.isOperator('{')) {
+            throw new Error(`Expected '{', got ${this.stream.peek()?.type}`);
+        }
+        this.stream.next();
+        const body = this.parseStatements();
+        if(!body) {
+            throw new Error(`Can't parse function body`);
+        }
+        if(!this.isOperator('}')) {
+            throw new Error(`Expected '}', got ${this.stream.peek()?.type}`);
+        }
+        const end = this.stream.next() as Token;
+        return new FunctionDeclarationNode(name, parameters, ret_type, body, extendPosition(kw_function.position, end.position));
     }
 
     private parseAssembly(): AssemblyNode {
@@ -211,6 +269,24 @@ export class Parser {
                 const expr = this.parseExpression();
                 return new VariableAssignmentNode(symbol, expr, extendPosition(symbol.position, expr.position));
             }
+            if(this.stream.peek()?.type == "(") {
+                this.stream.next();
+                const args: ExpressionNode[] = [];
+                if(!this.isOperator(")")) {
+                    while(true) {
+                        const expr = this.parseExpression();
+                        args.push(expr);
+                        if(this.isOperator(")")) {
+                            break;
+                        }
+                        if(!this.isOperator(",")) {
+                            throw new Error(`Expected ',' or ')', got ${this.stream.peek()?.type}`);
+                        }
+                    }
+                }
+                const end_paren = this.stream.next() as Token;
+                return new FunctionCallNode(symbol, args, extendPosition(symbol.position, end_paren.position));
+            }
             return symbol;
         }
         if(this.isOperator('(')) {
@@ -238,7 +314,7 @@ export class Parser {
     }
 
     private parseType(): TypeNode {
-        if(this.isKeyword("u8", "u16")) {
+        if(this.isKeyword("u8", "u16", "void")) {
             return new NativeTypeNode((this.stream.peek() as TokenKeyword).keyword, this.stream.next()?.position as Position);
         }
         throw new Error(`Expected type, got ${this.stream.peek()?.type}`);
