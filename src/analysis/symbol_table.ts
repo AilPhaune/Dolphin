@@ -1,6 +1,7 @@
+import { FunctionParameter } from "../ast/functions";
 import { TypeNode } from "../ast/type";
 import { Position } from "../lexer/token";
-import { RUNTIME_UINT16, RUNTIME_UINT8, RUNTIME_VOID, RuntimeNativeTypeName, RuntimeType } from "./rt_type";
+import { RUNTIME_UINT16, RUNTIME_UINT8, RUNTIME_VOID, RuntimeType } from "./rt_type";
 import { StackFrame } from "./stack_frame";
 
 export type Symbol = SymbolVariable | SymbolScope;
@@ -15,7 +16,7 @@ export interface SymbolVariable {
     table: SymbolTable;
 }
 
-export type SymbolScope = SymbolRegularScope | SymbolLoopScope;
+export type SymbolScope = SymbolRegularScope | SymbolLoopScope | SymbolScopeFunction;
 
 export interface SymbolScopeBase {
     type: "scope";
@@ -26,6 +27,8 @@ export interface SymbolScopeBase {
     anonymousCount: bigint;
     table: SymbolTable;
     stackframe?: StackFrame;
+    isStatic?: boolean;
+    staticAdress?: bigint | string;
 }
 
 export interface SymbolRegularScope extends SymbolScopeBase {
@@ -39,8 +42,16 @@ export interface SymbolLoopScope extends SymbolScopeBase {
     jumpBreakLabel?: string;
 }
 
+export interface SymbolScopeFunction extends SymbolScopeBase {
+    isBodyDeclared: boolean;
+    specialType: "function";
+    parameters: string[];
+}
+
 export class SymbolTable {
     public readonly root: SymbolScope;
+
+    public readonly functions: {[key: string]: SymbolScopeFunction};
 
     constructor() {
         this.root = {
@@ -51,11 +62,12 @@ export class SymbolTable {
             path: "",
             table: this
         };
+        this.functions = {};
     }
 
     find(name: string, parent: SymbolScope = this.root): Symbol | null {
         const parts = name.split('.');
-        if(parts.length == 0) return this.root;
+        if(name.length == 0 || parts.length == 0) return this.root;
         for(let i = 0; i < parts.length; i++) {
             const child = parent.children[parts[i]];
             if(!child || child.type != "scope") {
@@ -126,9 +138,39 @@ export class SymbolTable {
             path: `${parent.path == "" ? "" : (parent.path + ".")}${name}`,
             children: {},
             anonymousCount: 0n,
-            table: parent.table
+            table: parent.table,
+            isStatic
         };
         parent.children[name] = scope;
+        return scope;
+    }
+
+    static addFunctionScope(table: SymbolTable, name: string, parameters: FunctionParameter[]) {
+        if(table.functions[name]) {
+            if(table.functions[name].isBodyDeclared) {
+                throw new Error(`Function ${name} already exists`);
+            }
+            return table.functions[name];
+        }
+        if(table.root.children[name]) {
+            throw new Error(`Symbol ${name} already exists`);
+        }
+        const scope: SymbolScopeFunction = {
+            isBodyDeclared: false,
+            type: "scope",
+            specialType: "function",
+            path: `()${name}`,
+            children: {},
+            anonymousCount: 0n,
+            table,
+            parameters: [...parameters].map(p => p.name),
+            isStatic: true 
+        };
+        for(const param of parameters) {
+            SymbolTable.addVariable(scope, param.name, param.type, param.position);
+        }
+        table.functions[name] = scope;
+        table.root.children[name] = scope;
         return scope;
     }
 }

@@ -69,6 +69,24 @@ export class SymbolTableBuilder {
             for(const arg of node.args) {
                 this.findDeclarations(arg, parent);
             }
+        } else if(node.type == 'fun_decl') {
+            this.findDeclarations(node.ret_type, parent);
+            const scope = SymbolTable.addFunctionScope(parent.table, node.name.name, node.parameters);
+            node.generatedScope = scope;
+            for(const param of node.parameters) {
+                this.findDeclarations(param.type, scope);
+            }
+            if(node.body) {
+                for(const stmt of node.body.statements) {
+                    this.findDeclarations(stmt, scope);
+                }
+                scope.isBodyDeclared = true;
+            }
+        } else if(node.type == 'fun_call') {
+            this.findDeclarations(node.name, parent);
+            for(const arg of node.args) {
+                this.findDeclarations(arg, parent);
+            }
         } else if(node.type == 'litteral_instruction' || node.type == 'break_loop' || node.type == 'continue_loop' || node.type == 'void_expr' || node.type == 'integer' || node.type == 'string' || node.type == 'symbol' || node.type == 'native_type') {
             return;
         } else {
@@ -167,6 +185,27 @@ export class SymbolTableBuilder {
             }
             node.runtimeType = RUNTIME_VOID;
         } else if(node.type == 'asm_command') {
+            for(const arg of node.args) {
+                this.resolveTypes(arg, parent);
+            }
+        } else if(node.type == 'fun_decl') {
+            this.resolveTypes(node.ret_type, parent);
+            if(!node.generatedScope) {
+                throw new Error(`Scope for declarated function ${node.name} not generated.`);
+            }
+            for(const param of node.parameters) {
+                this.resolveTypes(param.type, node.generatedScope);
+            }
+            if(node.body) {
+                for(const stmt of node.body.statements) {
+                    this.resolveTypes(stmt, node.generatedScope);
+                }
+            }
+        } else if(node.type == 'fun_call') {
+            this.resolveTypes(node.name, parent);
+            if(!node.name.resolvedSymbol) {
+                throw new Error(`Can't resolve function ${node.name.name}`);
+            }
             for(const arg of node.args) {
                 this.resolveTypes(arg, parent);
             }

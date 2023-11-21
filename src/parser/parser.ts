@@ -134,6 +134,9 @@ export class Parser {
         }
         this.stream.next();
         const ret_type = this.parseType();
+        if(this.isOperator(';')) {
+            return new FunctionDeclarationNode(name, parameters, ret_type, null, extendPosition(kw_function.position, ret_type.position));
+        }
         if(!this.isOperator('{')) {
             throw new Error(`Expected '{', got ${this.stream.peek()?.type}`);
         }

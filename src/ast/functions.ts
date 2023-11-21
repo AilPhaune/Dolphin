@@ -1,4 +1,5 @@
 import { RUNTIME_VOID, RuntimeType, RuntimeVoid } from "../analysis/rt_type";
+import { SymbolScopeFunction } from "../analysis/symbol_table";
 import { Position, TokenSymbol } from "../lexer/token";
 import { AstNode } from "./ast";
 import { ExpressionNode, SymbolNode } from "./expression";
@@ -14,7 +15,8 @@ export interface FunctionParameter {
 export class FunctionDeclarationNode implements AstNode {
     public readonly type: "fun_decl" = "fun_decl";
     public runtimeType: RuntimeVoid = RUNTIME_VOID;
-    constructor(public readonly name: TokenSymbol, public readonly parameters: FunctionParameter[], public readonly ret_type: TypeNode, public readonly body: StatementsNode, public readonly position: Position) {}
+    public generatedScope: SymbolScopeFunction | null = null;
+    constructor(public readonly name: TokenSymbol, public readonly parameters: FunctionParameter[], public readonly ret_type: TypeNode, public readonly body: StatementsNode | null, public readonly position: Position) {}
 }
 
 export class FunctionCallNode implements AstNode {
