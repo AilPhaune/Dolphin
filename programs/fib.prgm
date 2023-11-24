@@ -1,0 +1,35 @@
+function fib(n: u8): u8 {
+    if (n) {
+        void;
+        let a: u8 = 0;
+        let b: u8 = 1;
+        while (n) {
+            n = n - 1;
+            let c: u8 = a + b;
+            a = b;
+            b = c;
+        }
+        b;
+    } else {
+        0
+    }
+}
+
+function display_u8(value: u8): void {
+    asm "dolphin" {
+        : "MOVE" : value : "A";
+        "MOVE #0, B";
+        "CALL _DisplayHexaByte";
+    }
+}
+
+let n: u8 = 0;
+
+while(n - 14) {
+    display_u8(fib(n));
+    n = n + 1;
+}
+
+asm "dolphin" {
+    "HALT";
+}

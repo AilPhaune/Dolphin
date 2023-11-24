@@ -1,6 +1,6 @@
-import { SymbolTable, SymbolScope, Symbol } from './symbol_table';
+import { SymbolTable, SymbolScope, Symbol, SymbolVariable } from './symbol_table';
 import { ASTNode } from '../ast/ast';
-import { RUNTIME_UINT8, RUNTIME_VOID, RuntimeType } from './rt_type';
+import { RUNTIME_UINT8, RUNTIME_VOID, RuntimeType, areTypesEqual } from './rt_type';
 
 export class SymbolTableBuilder {
 
@@ -71,16 +71,19 @@ export class SymbolTableBuilder {
             }
         } else if(node.type == 'fun_decl') {
             this.findDeclarations(node.ret_type, parent);
-            const scope = SymbolTable.addFunctionScope(parent.table, node.name.name, node.parameters);
+            const scope = SymbolTable.addFunctionScope(parent.table, node.name.name, node.parameters, node.ret_type);
             node.generatedScope = scope;
+            if(scope.parameters.length != node.parameters.length) {
+                throw new Error(`Function declaration is incompatible with previous definition (function '${node.name.name}')`);
+            }
             for(const param of node.parameters) {
                 this.findDeclarations(param.type, scope);
+                param.resolvedVariable = scope.children[param.name] as SymbolVariable;
             }
             if(node.body) {
-                for(const stmt of node.body.statements) {
-                    this.findDeclarations(stmt, scope);
-                }
+                this.findDeclarations(node.body, scope);
                 scope.isBodyDeclared = true;
+                scope.declaredBody = node.body;
             }
         } else if(node.type == 'fun_call') {
             this.findDeclarations(node.name, parent);
@@ -104,7 +107,7 @@ export class SymbolTableBuilder {
             if(!node.var_type.runtimeType) {
                 throw new Error(`Failed to parse runtime type for NodeType ${node.var_type}`);
             }
-            node.generatedScope.resolved_var_type = SymbolTable.resolveType(node.var_type.runtimeType);
+            node.generatedScope.resolved_var_type = node.var_type.runtimeType;
             if(node.value) {
                 this.resolveTypes(node.value, parent);
             }
@@ -137,6 +140,7 @@ export class SymbolTableBuilder {
         } else if(node.type == 'symbol') {
             node.resolvedSymbol = SymbolTable.resolveSymbol(parent, node.name);
             if(!node.resolvedSymbol) {
+                console.log(parent.children);
                 throw new Error(`Symbol '${node.name}' can't be resolved`);
             }
             if(node.resolvedSymbol.type == "variable") {
@@ -193,12 +197,21 @@ export class SymbolTableBuilder {
             if(!node.generatedScope) {
                 throw new Error(`Scope for declarated function ${node.name} not generated.`);
             }
+            if(!node.ret_type.runtimeType) {
+                throw new Error(`Return type of function ${node.name.name} can't be resolved`);
+            }
+            node.generatedScope.resolved_return_type = node.ret_type.runtimeType;
             for(const param of node.parameters) {
                 this.resolveTypes(param.type, node.generatedScope);
+                if(!param.resolvedVariable) {
+                    throw new Error(`Parameter '${param.name}' of function '${node.name.name}' couldn't be resolved to a variable`);
+                }
+                param.resolvedVariable.resolved_var_type = param.type.runtimeType;
             }
             if(node.body) {
-                for(const stmt of node.body.statements) {
-                    this.resolveTypes(stmt, node.generatedScope);
+                this.resolveTypes(node.body, node.generatedScope);
+                if(!areTypesEqual(node.body.runtimeType, node.ret_type.runtimeType)) {
+                    throw new Error(`Invalid return value for function '${node.name.name}': Expected ${JSON.stringify(node.ret_type.runtimeType)} but got ${JSON.stringify(node.body.runtimeType)}`);
                 }
             }
         } else if(node.type == 'fun_call') {
@@ -206,10 +219,17 @@ export class SymbolTableBuilder {
             if(!node.name.resolvedSymbol) {
                 throw new Error(`Can't resolve function ${node.name.name}`);
             }
+            if(node.name.resolvedSymbol.type != 'scope' || node.name.resolvedSymbol.specialType != 'function') {
+                throw new Error(`Can only call functions`);
+            }
+            if(!node.name.resolvedSymbol.resolved_return_type) {
+                throw new Error(`Function '${node.name.name}' return type has not been resolved`);
+            }
             for(const arg of node.args) {
                 this.resolveTypes(arg, parent);
             }
-        } else if(node.type == 'void_expr' || node.type == 'native_type' || node.type == 'litteral_instruction' || node.type == 'integer' || node.type == 'string') {
+            node.runtimeType = node.name.resolvedSymbol.resolved_return_type;
+        } else if(node.type == 'native_type' || node.type == 'void_expr' || node.type == 'litteral_instruction' || node.type == 'integer' || node.type == 'string') {
             return;
         } else {
             throw new Error(`SymbolTableBuilder.resolveTypes(): Unknown node type ${(node as any).type}`);

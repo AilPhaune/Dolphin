@@ -21,6 +21,9 @@ const replacer = (key: string, value: any) => {
     if(key == "table") {
         return undefined;
     }
+    if(key == "stackframe") {
+        return undefined;
+    }
     return value;
 };
 
@@ -50,4 +53,4 @@ compiler.compile(ast, (ast as StatementsNode).generatedScope?.stackframe as Stac
 
 console.log('Done.\n');
 
-console.log(compiler.assembly.finish());
+fs.writeFileSync("out.asm", compiler.assembly.finish());

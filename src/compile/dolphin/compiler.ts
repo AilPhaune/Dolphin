@@ -86,6 +86,10 @@ export class Assembly {
             if(!frame.parentStackFrame) break;
             frameOffset += frame.sizeBytes;
             frame = frame.parentStackFrame;
+            if(frame.scope.specialType == 'function') {
+                // skip the return adress that is also present on the stack
+                frameOffset += 2;
+            }
         } while(true);
         
         if(!f) return null;
@@ -251,6 +255,14 @@ export class Assembly {
     LABEL(name: string) {
         this.write(`${name}:`);
     }
+
+    CALL(adress: string) {
+        this.write(`CALL ${adress}`);
+    }
+
+    RET() {
+        this.write(`RET`);
+    }
 }
 
 export const ASM_BLOCK_COMPILER_NAME = "dolphin";
@@ -289,6 +301,7 @@ export class Compiler {
                 if(size != 0) {
                     if(node.runtimeType?.type == 'runtime_void') {
                         this.assembly.fixStackUnpush(size);
+                        size = 0;
                     } else if(node.runtimeType && size == getTypeSizeBytes(node.runtimeType)) {
                         for(let i = size - 1; i >= 0; i--) {
                             this.assembly.MOV(this.assembly.stackIndex(i), 'A');
@@ -311,9 +324,9 @@ export class Compiler {
                     throw new Error(`Can't assign ${JSON.stringify(node.runtimeType)} to ${JSON.stringify(node.generatedScope.resolved_var_type)}`);
                 }
                 this.compile(node.value, stackframe);
+                this.assembly.POP("A");
+                this.assembly.saveVariable(node.generatedScope.path, stackframe, 0, "A");
             }
-            this.assembly.POP("A");
-            this.assembly.saveVariable(node.generatedScope.path, stackframe, 0, "A");
         } else if(node.type == 'var_assign') {
             if(!node.resolvedVariable) {
                 throw new Error(`Can't compile variable assignment because the variable ${node.name.name} couldn't be resolved`);
@@ -325,6 +338,88 @@ export class Compiler {
             this.assembly.POP("A");
             this.assembly.saveVariable(node.resolvedVariable.path, stackframe, 0, "A");
             this.assembly.PUSH("A");
+        } else if(node.type == 'fun_decl') {
+            if(!node.generatedScope) {
+                throw new Error(`Scope for function ${node.name.name} not generated`);
+            }
+            const body = node.generatedScope.declaredBody;
+            if(!body) {
+                throw new Error(`Function ${node.name.name} never implemented`);
+            }
+            if(node.generatedScope.staticAdress) return;
+            if(!node.generatedScope.stackframe) {
+                throw new Error(`No stackframe generated for function ${node.name.name}`);
+            }
+            if(!body.runtimeType) {
+                throw new Error(`Return type for function ${node.name.name} not resolved`);
+            }
+            const label = this.assembly.nextLabel(`FUNCTION_${node.name.name}`);
+            const afterLabel = this.assembly.nextLabel(`END_FUNCTION_${node.name.name}`);
+            node.generatedScope.staticAdress = label;
+            this.assembly.JMP(afterLabel);
+            this.assembly.LABEL(label);
+            this.compile(body, stackframe);
+            
+            const retSize = getTypeSizeBytes(body.runtimeType);
+            if(retSize > 0) {
+                for(let i = retSize - 1; i >= 0; i--) {
+                    this.assembly.MOV(this.assembly.stackIndex(i), 'A');
+                    this.assembly.MOV('A', this.assembly.stackIndex(node.generatedScope.stackframe.sizeBytes + stackframe.sizeBytes + i + 2));
+                }
+                this.assembly.fixStackUnpush(retSize);
+            }
+
+            this.assembly.RET();
+            this.assembly.LABEL(afterLabel);
+        } else if(node.type == 'fun_call') {
+            if(node.name.resolvedSymbol?.type != "scope" || node.name.resolvedSymbol.specialType != "function") {
+                throw new Error(`Function ${node.name.name} not resolved`);
+            }
+            if(!node.name.resolvedSymbol.resolved_return_type) {
+                throw new Error(`Return type of function ${node.name.name} has not been resolved`);
+            }
+            if(!node.name.resolvedSymbol.staticAdress) {
+                throw new Error(`Function ${node.name.name} can't be called when not yet generated`);
+            }
+            if(!areTypesEqual(node.name.resolvedSymbol.resolved_return_type, node.runtimeType)) {
+                throw new Error(`Unexpected error while compiling function call: node.runtimeType, ${node.name.resolvedSymbol.resolved_return_type} != ${node.runtimeType}`);
+            }
+
+            // Allocate stack space for return value
+            const retValueSize = getTypeSizeBytes(node.name.resolvedSymbol.resolved_return_type);
+            if(retValueSize > 0) {
+                this.assembly.fixStackPush(retValueSize);
+            }
+
+            // Calculate the arguments
+            if(node.args.length != node.name.resolvedSymbol.parameters.length) {
+                throw new Error(`Function ${node.name.name} expects ${node.name.resolvedSymbol.parameters.length} arguments but was provided ${node.args.length}`);
+            }
+            let argsSize = 0;
+            for(let i = 0; i < node.args.length; i++) {
+                const arg = node.args[i];
+                const paramName = node.name.resolvedSymbol.parameters[i];
+                const param = node.name.resolvedSymbol.children[paramName];
+                if(param.type != "variable") {
+                    throw new Error(`Unexpected error while compiling function call: not a variable`);
+                }
+                if(!param.resolved_var_type) {
+                    throw new Error(`The type of the '${paramName}' parameter couldn't be resolved`);
+                }
+                if(!areTypesEqual(param.resolved_var_type, arg.runtimeType)) {
+                    throw new Error(`Parameter ${paramName} is of type ${param.resolved_var_type} but type ${arg.runtimeType} is provided`);
+                }
+                this.compile(arg, stackframe);
+                argsSize += getTypeSizeBytes(param.resolved_var_type);
+            }
+
+            // Call the function
+            this.assembly.CALL(node.name.resolvedSymbol.staticAdress.toString());
+
+            // Remove arguments
+            this.assembly.fixStackUnpush(argsSize);
+
+            // The result of the function is now on the stack
         } else if(node.type == 'bin_add') {
             if(!areTypesEqual(node.left.runtimeType, RUNTIME_UINT8) || !areTypesEqual(node.right.runtimeType, RUNTIME_UINT8)) {
                 throw new Error(`UNIMPLEMENTED: Can only compile addition of uint8 numbers`);
@@ -372,6 +467,7 @@ export class Compiler {
             if(!areTypesEqual(node.condition.runtimeType, RUNTIME_UINT8)) {
                 throw new Error(`UNIMPLEMENTED: Only uint8 is supported for if/else conditions, got ${node.runtimeType}`);
             }
+            const retTypeSize = node.runtimeType ? getTypeSizeBytes(node.runtimeType) : 0;
             this.compile(node.condition, stackframe);
             this.assembly.POP("A");
             this.assembly.CMP(this.assembly.integer(0), "A");
@@ -380,6 +476,7 @@ export class Compiler {
             this.assembly.JMP_EQ(node.else_branch ? else_branch_label : end_if_label); // the condition is false
             this.compile(node.if_branch, stackframe);
             if(node.else_branch) {
+                this.assembly.fixStackUnpushNoUpdateSP(retTypeSize);
                 this.assembly.JMP(end_if_label);
                 this.assembly.LABEL(else_branch_label);
                 this.compile(node.else_branch, stackframe);
@@ -480,7 +577,6 @@ export class Compiler {
             if(!(["X", "Y", "A", "B"].includes(dest.value))) {
                 throw new Error(`Invalid register, valid registers are X, Y, A and B`);
             }
-            console.log('---', from)
             this.assembly[type](from, dest.value);
         } else if(dest.type == "symbol") {
             if(!dest.runtimeType) {

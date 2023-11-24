@@ -179,3 +179,4 @@ ast.json
 symbols.json
 raw_ast.json
 tokens.json
+out.asm

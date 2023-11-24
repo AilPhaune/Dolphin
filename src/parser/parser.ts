@@ -57,6 +57,7 @@ export class Parser {
     
     private parseStatement(): StatementNode {
         if(this.stream.peek()?.type == "{") {
+            
             const stmts = this.parseStatements();
             if(!stmts) {
                 throw new Error("Expected statments");

@@ -5,7 +5,7 @@ import { SymbolTable, SymbolScope, SymbolVariable } from "./symbol_table";
 export interface StackFrameVariable {
     index: number;
     sizeBytes: number;
-    ref: SymbolVariable;
+    ref?: SymbolVariable;
 }
 
 export const FRAME_OFFSET_SIZE = 1;
@@ -14,13 +14,13 @@ export class StackFrame {
     public readonly sizeBytes: number;
     private variables: {[key: string]: Readonly<StackFrameVariable>};
 
-    constructor(vars: SymbolVariable[], public parentStackFrame?: StackFrame) {
+    constructor(vars: SymbolVariable[], public scope: SymbolScope, public parentStackFrame?: StackFrame) {
         this.variables = {};
         let size = 0;
         for(const variable of vars) {
             if(!variable) continue;
             if(!variable.resolved_var_type) {
-                throw new Error(`Variable has unresolved type: ${variable.var_type_node}`);
+                throw new Error(`Variable '${variable.name}' has unresolved type: ${JSON.stringify(variable.var_type_node)}`);
             }
             const vsize = getTypeSizeBytes(variable.resolved_var_type);
             this.variables[variable.path] = Object.freeze({
@@ -31,6 +31,12 @@ export class StackFrame {
             size += vsize;
         }
         this.sizeBytes = size;
+    }
+
+    get_reserved(offset: number, size: number = 1): StackFrameVariable {
+        return {
+            index: offset, sizeBytes: size
+        };
     }
 
     find(name: string): Readonly<StackFrameVariable> | null {
@@ -76,6 +82,23 @@ export class StackFrameBuilder {
             for(const arg of node.args) {
                 this.generate(arg, parentStackFrame);
             }
+        } else if(node.type == 'fun_decl') {
+            if(!node.body) return;
+            if(!node.generatedScope) {
+                throw new Error(`No scope generated for function ${node.name}`);
+            }
+            this.generate(node.ret_type, parentStackFrame);
+            const frame = this.build(node.generatedScope);
+            node.generatedScope.stackframe = frame;
+            for(const parameter of node.parameters) {
+                this.generate(parameter.type, frame);
+            }
+            this.generate(node.body, frame);
+        } else if(node.type == 'fun_call') {
+            this.generate(node.name, parentStackFrame);
+            for(const arg of node.args) {
+                this.generate(arg, parentStackFrame);
+            }
         } else if(node.type == 'litteral_instruction' || node.type == 'break_loop' || node.type == 'continue_loop' || node.type == 'void_expr' || node.type == 'native_type' || node.type == 'integer' || node.type == 'string' || node.type == 'symbol') {
             return;
         } else {
@@ -92,6 +115,6 @@ export class StackFrameBuilder {
                 vars.push(child);
             }
         }
-        return new StackFrame(vars, parentStackFrame);
+        return new StackFrame(vars, scope, parentStackFrame);
     }
 }

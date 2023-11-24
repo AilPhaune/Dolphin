@@ -1,4 +1,5 @@
 import { FunctionParameter } from "../ast/functions";
+import { StatementsNode } from "../ast/statements";
 import { TypeNode } from "../ast/type";
 import { Position } from "../lexer/token";
 import { RUNTIME_UINT16, RUNTIME_UINT8, RUNTIME_VOID, RuntimeType } from "./rt_type";
@@ -43,9 +44,12 @@ export interface SymbolLoopScope extends SymbolScopeBase {
 }
 
 export interface SymbolScopeFunction extends SymbolScopeBase {
+    declaredBody: StatementsNode | null;
     isBodyDeclared: boolean;
     specialType: "function";
     parameters: string[];
+    returnType: TypeNode;
+    resolved_return_type?: RuntimeType | null;
 }
 
 export class SymbolTable {
@@ -69,7 +73,12 @@ export class SymbolTable {
         const parts = name.split('.');
         if(name.length == 0 || parts.length == 0) return this.root;
         for(let i = 0; i < parts.length; i++) {
-            const child = parent.children[parts[i]];
+            let child: Symbol | null = null;
+            if(parts[i].endsWith('()')) {
+                child = parent.children[parts[i].replace(/\(\)$/g, '')];
+            } else {
+                child = parent.children[parts[i]];
+            }
             if(!child || child.type != "scope") {
                 return null;
             }
@@ -86,10 +95,11 @@ export class SymbolTable {
         return symbol;
     }
 
-    static resolveType(type: RuntimeType): RuntimeType | null {
+    static resolveType(type: RuntimeType): RuntimeType {
         if(type.type == "native_typename") {
             if(type.name == "u8") return RUNTIME_UINT8;
             if(type.name == "u16") return RUNTIME_UINT16;
+            if(type.name == "void") return RUNTIME_VOID;
             throw new Error(`Invalid native type '${type.name}'`);
         }
         if(type.type == "runtime_int") return type;
@@ -102,9 +112,9 @@ export class SymbolTable {
             if(name in scope.children) {
                 return scope.children[name];
             }
+            if(scope == scope.table.root) break;
             let path = scope.path.split('.');
             path.pop();
-            if(name.length == 0) break;
             const found = scope.table.find(path.join('.'));
             if(!found) break;
             if(found.type != 'scope') break;
@@ -145,7 +155,7 @@ export class SymbolTable {
         return scope;
     }
 
-    static addFunctionScope(table: SymbolTable, name: string, parameters: FunctionParameter[]) {
+    static addFunctionScope(table: SymbolTable, name: string, parameters: FunctionParameter[], returnType: TypeNode) {
         if(table.functions[name]) {
             if(table.functions[name].isBodyDeclared) {
                 throw new Error(`Function ${name} already exists`);
@@ -157,14 +167,16 @@ export class SymbolTable {
         }
         const scope: SymbolScopeFunction = {
             isBodyDeclared: false,
+            declaredBody: null,
             type: "scope",
             specialType: "function",
-            path: `()${name}`,
+            path: `${name}`,
             children: {},
             anonymousCount: 0n,
             table,
             parameters: [...parameters].map(p => p.name),
-            isStatic: true 
+            isStatic: true,
+            returnType
         };
         for(const param of parameters) {
             SymbolTable.addVariable(scope, param.name, param.type, param.position);
