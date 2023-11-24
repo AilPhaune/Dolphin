@@ -115,6 +115,6 @@ export class StackFrameBuilder {
                 vars.push(child);
             }
         }
-        return new StackFrame(vars, scope, parentStackFrame);
+        return new StackFrame(vars.reverse(), scope, parentStackFrame);
     }
 }

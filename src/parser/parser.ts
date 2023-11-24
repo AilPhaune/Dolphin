@@ -127,6 +127,7 @@ export class Parser {
                 if(!this.isOperator(',')) {
                     throw new Error(`Expected ',' or ')', got ${this.stream.peek()?.type}`);
                 }
+                this.stream.next();
             }
         }
         this.stream.next();
@@ -286,6 +287,7 @@ export class Parser {
                         if(!this.isOperator(",")) {
                             throw new Error(`Expected ',' or ')', got ${this.stream.peek()?.type}`);
                         }
+                        this.stream.next();
                     }
                 }
                 const end_paren = this.stream.next() as Token;
