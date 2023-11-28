@@ -59,7 +59,7 @@ export class StackFrameBuilder {
             if(node.value) {
                 this.generate(node.value, parentStackFrame);
             }
-        } else if(node.type == 'bin_add' || node.type == 'bin_sub') {
+        } else if(node.type == 'bin_add' || node.type == 'bin_sub' || node.type == 'bin_or' || node.type == 'bin_and' || node.type == 'bin_xor') {
             this.generate(node.left, parentStackFrame);
             this.generate(node.right, parentStackFrame);
         } else if(node.type == 'if_else') {

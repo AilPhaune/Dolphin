@@ -3,7 +3,7 @@ import { Position, Token, TokenInteger, TokenKeyword, TokenString, TokenSymbol, 
 import { CancelableStream, cancelableOf } from "../stream/stream";
 import { StatementNode, StatementsNode } from "../ast/statements";
 import { VariableAssignmentNode, VariableDeclarationNode } from "../ast/var";
-import { AdditionNode, ExpressionNode, IntegerNode, StringNode, SubtractionNode, SymbolNode, VoidNode } from "../ast/expression";
+import { AdditionNode, BinaryAndNode, BinaryOrNode, ExpressionNode, IntegerNode, StringNode, SubtractionNode, SymbolNode, VoidNode, XorNode } from "../ast/expression";
 import { NativeTypeNode, TypeNode } from "../ast/type";
 import { ASTNode } from "../ast/ast";
 import { BreakNode, ContinueNode, IfElseNode, WhileLoopNode } from "../ast/controlflow";
@@ -240,13 +240,19 @@ export class Parser {
 
     private parseAddition(): ExpressionNode {
         let left = this.parseAtom();
-        while(this.isOperator("+", "-")) {
+        while(this.isOperator("+", "-", "|", "&", "^")) {
             const operator = this.stream.next() as Token;
             const right = this.parseAtom();
             if(operator.type == "+") {
                 left = new AdditionNode(left, right, extendPosition(left.position, right.position));
             } else if(operator.type == "-") {
                 left = new SubtractionNode(left, right, extendPosition(left.position, right.position));
+            } else if(operator.type == "|") {
+                left = new BinaryOrNode(left, right, extendPosition(left.position, right.position));
+            } else if(operator.type == "&") {
+                left = new BinaryAndNode(left, right, extendPosition(left.position, right.position));
+            } else if(operator.type == "^") {
+                left = new XorNode(left, right, extendPosition(left.position, right.position));
             } else {
                 throw new Error(`Unsupported binary operator: ${operator.type}`);
             }

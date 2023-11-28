@@ -40,7 +40,7 @@ export class SymbolTableBuilder {
             for(const stmt of node.statements) {
                 this.findDeclarations(stmt, scope);
             }
-        } else if(node.type == 'bin_add' || node.type == 'bin_sub') {
+        } else if(node.type == 'bin_add' || node.type == 'bin_sub' || node.type == 'bin_or' || node.type == 'bin_and' || node.type == 'bin_xor') {
             this.findDeclarations(node.left, parent);
             this.findDeclarations(node.right, parent);
         } else if(node.type == 'if_else') {
@@ -120,11 +120,11 @@ export class SymbolTableBuilder {
                 this.resolveTypes(stmt, node.generatedScope);
                 node.runtimeType = stmt.runtimeType;
             }
-        } else if(node.type == 'bin_add' || node.type == 'bin_sub') {
+        } else if(node.type == 'bin_add' || node.type == 'bin_sub' || node.type == 'bin_and' || node.type == 'bin_or' || node.type == 'bin_xor') {
             this.resolveTypes(node.left, parent);
             this.resolveTypes(node.right, parent);
             if(node.left.runtimeType != RUNTIME_UINT8 || node.right.runtimeType != RUNTIME_UINT8) {
-                throw new Error("Math is limited to adding two u8");
+                throw new Error("Math is limited to u8");
             }
             node.runtimeType = RUNTIME_UINT8;
         } else if(node.type == 'if_else') {

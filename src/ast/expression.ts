@@ -7,7 +7,7 @@ import { FunctionCallNode } from "./functions";
 import { StatementsNode } from "./statements";
 import { VariableAssignmentNode } from "./var";
 
-export type ExpressionNode = IntegerNode | StringNode | SymbolNode | StatementsNode | AdditionNode | SubtractionNode | IfElseNode | VariableAssignmentNode | VoidNode | FunctionCallNode;
+export type ExpressionNode = IntegerNode | StringNode | SymbolNode | StatementsNode | AdditionNode | SubtractionNode | BinaryOrNode | BinaryAndNode | XorNode | IfElseNode | VariableAssignmentNode | VoidNode | FunctionCallNode;
 
 export class AdditionNode implements AstNode {
     public readonly type: "bin_add" = "bin_add";
@@ -17,6 +17,24 @@ export class AdditionNode implements AstNode {
 
 export class SubtractionNode implements AstNode {
     public readonly type: "bin_sub" = "bin_sub";
+    public runtimeType: RuntimeType | null = null;
+    constructor(public readonly left: ExpressionNode, public readonly right: ExpressionNode, public position: Position) {}
+}
+
+export class BinaryOrNode implements AstNode {
+    public readonly type: "bin_or" = "bin_or";
+    public runtimeType: RuntimeType | null = null;
+    constructor(public readonly left: ExpressionNode, public readonly right: ExpressionNode, public position: Position) {}
+}
+
+export class BinaryAndNode implements AstNode {
+    public readonly type: "bin_and" = "bin_and";
+    public runtimeType: RuntimeType | null = null;
+    constructor(public readonly left: ExpressionNode, public readonly right: ExpressionNode, public position: Position) {}
+}
+
+export class XorNode implements AstNode {
+    public readonly type: "bin_xor" = "bin_xor";
     public runtimeType: RuntimeType | null = null;
     constructor(public readonly left: ExpressionNode, public readonly right: ExpressionNode, public position: Position) {}
 }

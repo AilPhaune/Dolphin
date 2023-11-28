@@ -172,6 +172,24 @@ export class Assembly {
         this.write(`SUB ${value}, ${dest}`);
     }
 
+    OR(value: string, dest: string) {
+        if(["#0", "H'0", "H'00", "H'00"].includes(value)) {
+            return;
+        }
+        this.write(`OR ${value}, ${dest}`);
+    }
+
+    AND(value: string, dest: string) {
+        this.write(`AND ${value}, ${dest}`);
+    }
+
+    XOR(value: string, dest: string) {
+        if(["#0", "H'0", "H'00", "H'00"].includes(value)) {
+            return;
+        }
+        this.write(`XOR ${value}, ${dest}`);
+    }
+
     private push() {
         this.stack.push((this.stack.pop() ?? -1) + 1);
     }
@@ -439,6 +457,36 @@ export class Compiler {
             this.assembly.POP("A"); // right
             this.assembly.POP("B"); // left
             this.assembly.SUB("A", "B"); // left - right
+            this.assembly.PUSH("B");
+        } else if(node.type == 'bin_or') {
+            if(!areTypesEqual(node.left.runtimeType, RUNTIME_UINT8) || !areTypesEqual(node.right.runtimeType, RUNTIME_UINT8)) {
+                throw new Error(`UNIMPLEMENTED: Can only compile subtraction of uint8 numbers`);
+            }
+            this.compile(node.left, stackframe);
+            this.compile(node.right, stackframe);
+            this.assembly.POP("A"); // right
+            this.assembly.POP("B"); // left
+            this.assembly.OR("A", "B"); // left - right
+            this.assembly.PUSH("B");
+        } else if(node.type == 'bin_and') {
+            if(!areTypesEqual(node.left.runtimeType, RUNTIME_UINT8) || !areTypesEqual(node.right.runtimeType, RUNTIME_UINT8)) {
+                throw new Error(`UNIMPLEMENTED: Can only compile subtraction of uint8 numbers`);
+            }
+            this.compile(node.left, stackframe);
+            this.compile(node.right, stackframe);
+            this.assembly.POP("A"); // right
+            this.assembly.POP("B"); // left
+            this.assembly.AND("A", "B"); // left - right
+            this.assembly.PUSH("B");
+        } else if(node.type == 'bin_xor') {
+            if(!areTypesEqual(node.left.runtimeType, RUNTIME_UINT8) || !areTypesEqual(node.right.runtimeType, RUNTIME_UINT8)) {
+                throw new Error(`UNIMPLEMENTED: Can only compile subtraction of uint8 numbers`);
+            }
+            this.compile(node.left, stackframe);
+            this.compile(node.right, stackframe);
+            this.assembly.POP("A"); // right
+            this.assembly.POP("B"); // left
+            this.assembly.XOR("A", "B"); // left - right
             this.assembly.PUSH("B");
         } else if(node.type == 'integer') {
             if(!areTypesEqual(node.runtimeType, RUNTIME_UINT8)) {

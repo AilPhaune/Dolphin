@@ -1,4 +1,4 @@
-function display_u8(value: u8): void {
+function display_u8_hex(value: u8): void {
     asm "dolphin" {
         : "MOVE" : value : "A";
         "MOVE #0, B";
@@ -6,13 +6,7 @@ function display_u8(value: u8): void {
     }
 }
 
-function my_function(x: u8, y: u8, z: u8): u8 {
-    y
-}
-
-let n: u8 = my_function(5, 8, 1);
-
-display_u8(n);
+display_u8_hex(23 ^ 49);
 
 asm "dolphin" {
     "HALT";
